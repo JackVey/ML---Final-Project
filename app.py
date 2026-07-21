@@ -53,13 +53,12 @@ st.markdown("---")
 
 tab1, tab2 = st.tabs(["Scenario Test (Sample Data)", "Upload CSV File"])
 
-
 with tab1:
     st.subheader("Run Quick Prediction on Sensor Window")
 
     if st.button("Run Prediction on Simulated Data", type="primary"):
 
-        n_features = len(metadata["active_sensors"]) * metadata["window_size_W"]
+        n_features = xgb_model.n_features_in_
         sample_input = np.random.randn(1, n_features)
 
         predicted_rul = float(xgb_model.predict(sample_input)[0])
@@ -116,7 +115,6 @@ with tab1:
                     st.warning("Local outlier anomaly identified (LOF).")
                 else:
                     st.info("No local anomalies observed (LOF).")
-
 
 with tab2:
     st.subheader("Upload CSV File Containing Sensor Data")
