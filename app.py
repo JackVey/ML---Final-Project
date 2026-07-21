@@ -89,7 +89,9 @@ with tab1:
             )
 
         with col3:
-            if predicted_rul <= metadata["rul_threshold"]:
+            DANGER_THRESHOLD = 30
+
+            if predicted_rul <= DANGER_THRESHOLD:
                 st.error("Status: Immediate overhaul required (High Risk)")
             else:
                 st.success("Status: Optimal and normal operation")
