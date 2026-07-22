@@ -338,7 +338,10 @@
 #
 #         predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
 #
-#     if predict_button:
+#     if predict_button or st.session_state.get('prediction_done', False):
+#         if predict_button:
+#             st.session_state.prediction_done = True
+#
 #         current_row = engine_data[engine_data['cycle'] == selected_cycle]
 #         if len(current_row) == 0:
 #             st.error("Invalid selection! Please choose a valid cycle.")
@@ -362,168 +365,195 @@
 #             except:
 #                 features = np.array([float(x) if isinstance(x, (int, float)) else 0.0 for x in features])
 #
-#         with st.spinner("Making predictions..."):
-#             rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
-#             risks = predict_failure_risk(features, selected_dataset, artifacts)
-#             anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
-#             recommendation = make_recommendation(
-#                 rul_pred, rul_lower, rul_upper,
-#                 risks, anomaly_scores, selected_dataset, artifacts
-#             )
-#
-#         st.subheader("Current Engine Status")
-#
-#         col1, col2, col3, col4 = st.columns(4)
-#
-#         with col1:
-#             st.metric(
-#                 "Remaining Useful Life",
-#                 f"{rul_pred:.0f} cycles",
-#                 delta=f"95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]"
-#             )
-#
-#         with col2:
-#             prob_h30 = risks['h30']['probability']
-#             st.metric(
-#                 "Failure Risk (30 cycles)",
-#                 f"{prob_h30:.1%}",
-#                 delta=f"Threshold: {risks['h30']['threshold']:.2f}"
-#             )
-#
-#         with col3:
-#             anomaly_score = anomaly_scores['OCSVM']['percentile']
-#             st.metric(
-#                 "Anomaly Score",
-#                 f"{anomaly_score:.1f}th percentile",
-#                 delta="Critical > 95%"
-#             )
-#
-#         with col4:
-#             color = recommendation['color']
-#             st.markdown(f"""
-#             <div style="padding: 15px; border-radius: 10px; background-color: {color}; text-align: center;">
-#                 <h2 style="color: white; margin: 0; font-size: 24px;">{recommendation['action']}</h2>
-#                 <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">Confidence: {recommendation['confidence']}</p>
-#             </div>
-#             """, unsafe_allow_html=True)
-#
-#         st.subheader("Failure Risk by Horizon")
-#
-#         col1, col2, col3 = st.columns(3)
-#         for i, h in enumerate([10, 20, 30]):
-#             with [col1, col2, col3][i]:
-#                 prob = risks[f'h{h}']['probability']
-#                 alert = risks[f'h{h}']['alert']
-#                 st.metric(
-#                     f"Risk in {h} cycles",
-#                     f"{prob:.1%}",
-#                     delta="ALERT" if alert else "Normal"
+#         if predict_button:
+#             with st.spinner("Making predictions..."):
+#                 rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
+#                 risks = predict_failure_risk(features, selected_dataset, artifacts)
+#                 anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
+#                 recommendation = make_recommendation(
+#                     rul_pred, rul_lower, rul_upper,
+#                     risks, anomaly_scores, selected_dataset, artifacts
 #                 )
 #
-#         st.subheader("Anomaly Detection Results")
+#                 st.session_state.rul_pred = rul_pred
+#                 st.session_state.rul_lower = rul_lower
+#                 st.session_state.rul_upper = rul_upper
+#                 st.session_state.risks = risks
+#                 st.session_state.anomaly_scores = anomaly_scores
+#                 st.session_state.recommendation = recommendation
+#                 st.session_state.processed_df = processed_df
+#                 st.session_state.engine_data = engine_data
+#                 st.session_state.selected_cycle = selected_cycle
+#                 st.session_state.selected_dataset = selected_dataset
+#                 st.session_state.artifacts = artifacts
 #
-#         anomaly_data = []
-#         for name, scores in anomaly_scores.items():
-#             anomaly_data.append({
-#                 'Method': name,
-#                 'Score': f"{scores['percentile']:.1f}th percentile",
-#                 'Status': 'ALERT' if scores['alert'] else 'Normal'
-#             })
-#         st.dataframe(pd.DataFrame(anomaly_data), hide_index=True, use_container_width=True)
+#         if st.session_state.get('prediction_done', False):
+#             rul_pred = st.session_state.rul_pred
+#             rul_lower = st.session_state.rul_lower
+#             rul_upper = st.session_state.rul_upper
+#             risks = st.session_state.risks
+#             anomaly_scores = st.session_state.anomaly_scores
+#             recommendation = st.session_state.recommendation
+#             processed_df = st.session_state.processed_df
+#             engine_data = st.session_state.engine_data
+#             selected_cycle = st.session_state.selected_cycle
+#             selected_dataset = st.session_state.selected_dataset
+#             artifacts = st.session_state.artifacts
 #
-#         st.subheader("Decision Triggers")
+#             st.subheader("Current Engine Status")
 #
-#         triggers = recommendation['triggers']
-#         if len(triggers) > 1:
-#             st.warning("Active triggers:")
-#             for trigger in triggers:
-#                 st.write(f"- {trigger}")
-#         else:
-#             st.success(triggers[0])
+#             col1, col2, col3, col4 = st.columns(4)
 #
-#         st.subheader("Engine Health Timeline")
-#
-#         dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
-#
-#         sensor_cols = [col for col in processed_df.columns if col.endswith('_raw') and 'sensor_' in col]
-#         sensor_cols = [col for col in sensor_cols if col.replace('_raw', '') not in dropped_sensors]
-#
-#         col1, col2 = st.columns([2, 1])
-#         with col1:
-#             selected_sensor = st.selectbox(
-#                 "Select Sensor to Visualize",
-#                 sensor_cols if sensor_cols else ['sensor_2_raw'],
-#                 format_func=lambda x: x.replace('_raw', '')
-#             )
-#         with col2:
-#             show_health = st.checkbox("Show Health Features", value=False)
-#
-#         if show_health:
-#             fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
-#                                 vertical_spacing=0.15)
-#
-#             fig.add_trace(
-#                 go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='True RUL',
-#                            line=dict(color='green', width=2)),
-#                 row=1, col=1
-#             )
-#             fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
-#
-#             anomaly_col = 'OCSVM_Anomaly_Score'
-#             if anomaly_col in engine_data.columns:
-#                 fig.add_trace(
-#                     go.Scatter(x=engine_data['cycle'], y=engine_data[anomaly_col], mode='lines', name='Anomaly Score',
-#                                line=dict(color='orange', width=2)),
-#                     row=2, col=1
-#                 )
-#                 fig.add_hline(y=95, line_dash="dash", line_color="red", annotation_text="Critical", row=2, col=1)
-#                 fig.add_hline(y=90, line_dash="dot", line_color="orange", annotation_text="Warning", row=2, col=1)
-#
-#             fig.update_layout(height=500, showlegend=True)
-#
-#         else:
-#             fig = go.Figure()
-#
-#             fig.add_trace(
-#                 go.Scatter(x=engine_data['cycle'], y=engine_data[selected_sensor], mode='lines',
-#                            name=selected_sensor.replace('_raw', ''),
-#                            line=dict(color='blue', width=2))
-#             )
-#
-#             fig.add_trace(
-#                 go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='RUL',
-#                            line=dict(color='green', width=2, dash='dot'), yaxis='y2')
-#             )
-#
-#             fig.update_layout(
-#                 yaxis=dict(title=selected_sensor.replace('_raw', '')),
-#                 yaxis2=dict(title='RUL', overlaying='y', side='right'),
-#                 height=400,
-#                 showlegend=True
-#             )
-#
-#         fig.add_vline(x=selected_cycle, line_dash="dash", line_color="red", annotation_text="Current Cycle",
-#                       annotation_position="top")
-#         st.plotly_chart(fig, use_container_width=True)
-#
-#         with st.expander("Model Metadata"):
-#             metadata = artifacts[selected_dataset]['metadata']
-#             rul_params = artifacts[selected_dataset]['rul_params']
-#             col1, col2 = st.columns(2)
 #             with col1:
-#                 st.write("**Dataset Information**")
-#                 st.write(f"- Dataset: {metadata.get('dataset', 'N/A')}")
-#                 st.write(f"- Description: {metadata.get('description', 'N/A')}")
-#                 st.write(f"- Training Date: {metadata.get('training_date', 'N/A')}")
-#                 st.write(f"- Author: {metadata.get('author', 'N/A')}")
+#                 st.metric(
+#                     "Remaining Useful Life",
+#                     f"{rul_pred:.0f} cycles",
+#                     delta=f"95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]"
+#                 )
+#
 #             with col2:
-#                 st.write("**Model Configuration**")
-#                 st.write(f"- Model Version: {metadata.get('model_version', 'N/A')}")
-#                 st.write(f"- Window Size: {metadata.get('window_size', 'N/A')} cycles")
-#                 st.write(f"- RUL Cap: {rul_params.get('rul_cap', 125)} cycles")
-#                 st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
-#                 if selected_dataset == 'FD002':
-#                     st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
+#                 prob_h30 = risks['h30']['probability']
+#                 st.metric(
+#                     "Failure Risk (30 cycles)",
+#                     f"{prob_h30:.1%}",
+#                     delta=f"Threshold: {risks['h30']['threshold']:.2f}"
+#                 )
+#
+#             with col3:
+#                 anomaly_score = anomaly_scores['OCSVM']['percentile']
+#                 st.metric(
+#                     "Anomaly Score",
+#                     f"{anomaly_score:.1f}th percentile",
+#                     delta="Critical > 95%"
+#                 )
+#
+#             with col4:
+#                 color = recommendation['color']
+#                 st.markdown(f"""
+#                 <div style="padding: 15px; border-radius: 10px; background-color: {color}; text-align: center;">
+#                     <h2 style="color: white; margin: 0; font-size: 24px;">{recommendation['action']}</h2>
+#                     <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">Confidence: {recommendation['confidence']}</p>
+#                 </div>
+#                 """, unsafe_allow_html=True)
+#
+#             st.subheader("Failure Risk by Horizon")
+#
+#             col1, col2, col3 = st.columns(3)
+#             for i, h in enumerate([10, 20, 30]):
+#                 with [col1, col2, col3][i]:
+#                     prob = risks[f'h{h}']['probability']
+#                     alert = risks[f'h{h}']['alert']
+#                     st.metric(
+#                         f"Risk in {h} cycles",
+#                         f"{prob:.1%}",
+#                         delta="ALERT" if alert else "Normal"
+#                     )
+#
+#             st.subheader("Anomaly Detection Results")
+#
+#             anomaly_data = []
+#             for name, scores in anomaly_scores.items():
+#                 anomaly_data.append({
+#                     'Method': name,
+#                     'Score': f"{scores['percentile']:.1f}th percentile",
+#                     'Status': 'ALERT' if scores['alert'] else 'Normal'
+#                 })
+#             st.dataframe(pd.DataFrame(anomaly_data), hide_index=True, use_container_width=True)
+#
+#             st.subheader("Decision Triggers")
+#
+#             triggers = recommendation['triggers']
+#             if len(triggers) > 1:
+#                 st.warning("Active triggers:")
+#                 for trigger in triggers:
+#                     st.write(f"- {trigger}")
+#             else:
+#                 st.success(triggers[0])
+#
+#             st.subheader("Engine Health Timeline")
+#
+#             dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
+#
+#             sensor_cols = [col for col in processed_df.columns if col.endswith('_raw') and 'sensor_' in col]
+#             sensor_cols = [col for col in sensor_cols if col.replace('_raw', '') not in dropped_sensors]
+#
+#             col1, col2 = st.columns([2, 1])
+#             with col1:
+#                 selected_sensor = st.selectbox(
+#                     "Select Sensor to Visualize",
+#                     sensor_cols if sensor_cols else ['sensor_2_raw'],
+#                     format_func=lambda x: x.replace('_raw', '')
+#                 )
+#             with col2:
+#                 show_health = st.checkbox("Show Health Features", value=False)
+#
+#             if show_health:
+#                 fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
+#                                     vertical_spacing=0.15)
+#
+#                 fig.add_trace(
+#                     go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='True RUL',
+#                                line=dict(color='green', width=2)),
+#                     row=1, col=1
+#                 )
+#                 fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
+#
+#                 anomaly_col = 'OCSVM_Anomaly_Score'
+#                 if anomaly_col in engine_data.columns:
+#                     fig.add_trace(
+#                         go.Scatter(x=engine_data['cycle'], y=engine_data[anomaly_col], mode='lines',
+#                                    name='Anomaly Score',
+#                                    line=dict(color='orange', width=2)),
+#                         row=2, col=1
+#                     )
+#                     fig.add_hline(y=95, line_dash="dash", line_color="red", annotation_text="Critical", row=2, col=1)
+#                     fig.add_hline(y=90, line_dash="dot", line_color="orange", annotation_text="Warning", row=2, col=1)
+#
+#                 fig.update_layout(height=500, showlegend=True)
+#
+#             else:
+#                 fig = go.Figure()
+#
+#                 fig.add_trace(
+#                     go.Scatter(x=engine_data['cycle'], y=engine_data[selected_sensor], mode='lines',
+#                                name=selected_sensor.replace('_raw', ''),
+#                                line=dict(color='blue', width=2))
+#                 )
+#
+#                 fig.add_trace(
+#                     go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='RUL',
+#                                line=dict(color='green', width=2, dash='dot'), yaxis='y2')
+#                 )
+#
+#                 fig.update_layout(
+#                     yaxis=dict(title=selected_sensor.replace('_raw', '')),
+#                     yaxis2=dict(title='RUL', overlaying='y', side='right'),
+#                     height=400,
+#                     showlegend=True
+#                 )
+#
+#             fig.add_vline(x=selected_cycle, line_dash="dash", line_color="red", annotation_text="Current Cycle",
+#                           annotation_position="top")
+#             st.plotly_chart(fig, use_container_width=True)
+#
+#             with st.expander("Model Metadata"):
+#                 metadata = artifacts[selected_dataset]['metadata']
+#                 rul_params = artifacts[selected_dataset]['rul_params']
+#                 col1, col2 = st.columns(2)
+#                 with col1:
+#                     st.write("**Dataset Information**")
+#                     st.write(f"- Dataset: {metadata.get('dataset', 'N/A')}")
+#                     st.write(f"- Description: {metadata.get('description', 'N/A')}")
+#                     st.write(f"- Training Date: {metadata.get('training_date', 'N/A')}")
+#                     st.write(f"- Author: {metadata.get('author', 'N/A')}")
+#                 with col2:
+#                     st.write("**Model Configuration**")
+#                     st.write(f"- Model Version: {metadata.get('model_version', 'N/A')}")
+#                     st.write(f"- Window Size: {metadata.get('window_size', 'N/A')} cycles")
+#                     st.write(f"- RUL Cap: {rul_params.get('rul_cap', 125)} cycles")
+#                     st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
+#                     if selected_dataset == 'FD002':
+#                         st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
 #
 #
 # if __name__ == "__main__":
@@ -567,7 +597,6 @@ def load_artifacts():
         artifacts[dataset]['window_info'] = joblib.load(f'saved_artifacts/{ds_info["window_info"]}')
         artifacts[dataset]['conformal_params'] = joblib.load(f'saved_artifacts/{ds_info["conformal_params"]}')
         artifacts[dataset]['tuned_thresholds'] = joblib.load(f'saved_artifacts/{ds_info["tuned_thresholds"]}')
-        artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
         artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
 
         if 'feature_names' in ds_info:
@@ -775,15 +804,27 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
     anomaly_score = anomaly_scores['OCSVM']['percentile']
     interval_width = rul_upper - rul_lower
 
-    if rul_lower < decision_params['stop_rules']['rul_lower_bound'] or prob_h30 > decision_params['stop_rules'][
-        'failure_prob_threshold'] or anomaly_score > decision_params['stop_rules']['anomaly_threshold']:
+    stop_rul_threshold = decision_params['stop_rules'].get('rul_lower_bound', 20)
+    stop_prob_threshold = decision_params['stop_rules'].get('failure_prob_threshold', 0.6)
+    stop_anomaly_threshold = decision_params['stop_rules'].get('anomaly_threshold', 95)
+
+    inspect_rul_threshold = decision_params['inspect_rules'].get('rul_lower_bound', 30)
+    inspect_prob_threshold = decision_params['inspect_rules'].get('failure_prob_threshold', 0.3)
+    inspect_anomaly_threshold = decision_params['inspect_rules'].get('anomaly_threshold', 90)
+    inspect_uncertainty_threshold = decision_params['inspect_rules'].get('uncertainty_threshold', 50)
+
+    if (rul_lower < stop_rul_threshold or
+            prob_h30 > stop_prob_threshold or
+            anomaly_score > stop_anomaly_threshold):
+
         triggers = []
-        if rul_lower < decision_params['stop_rules']['rul_lower_bound']:
-            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold")
-        if prob_h30 > decision_params['stop_rules']['failure_prob_threshold']:
-            triggers.append(f"Failure probability ({prob_h30:.1%}) above critical threshold")
-        if anomaly_score > decision_params['stop_rules']['anomaly_threshold']:
-            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold")
+        if rul_lower < stop_rul_threshold:
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rul_threshold})")
+        if prob_h30 > stop_prob_threshold:
+            triggers.append(
+                f"Failure probability ({prob_h30:.1%}) above critical threshold ({stop_prob_threshold:.0%})")
+        if anomaly_score > stop_anomaly_threshold:
+            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_anomaly_threshold})")
 
         return {
             'action': 'STOP',
@@ -792,18 +833,23 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
             'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
         }
 
-    elif rul_lower < decision_params['inspect_rules']['rul_lower_bound'] or prob_h30 > decision_params['inspect_rules'][
-        'failure_prob_threshold'] or anomaly_score > decision_params['inspect_rules'][
-        'anomaly_threshold'] or interval_width > decision_params['inspect_rules']['uncertainty_threshold']:
+    elif (rul_lower < inspect_rul_threshold or
+          prob_h30 > inspect_prob_threshold or
+          anomaly_score > inspect_anomaly_threshold or
+          interval_width > inspect_uncertainty_threshold):
+
         triggers = []
-        if rul_lower < decision_params['inspect_rules']['rul_lower_bound']:
-            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold")
-        if prob_h30 > decision_params['inspect_rules']['failure_prob_threshold']:
-            triggers.append(f"Failure probability ({prob_h30:.1%}) above inspect threshold")
-        if anomaly_score > decision_params['inspect_rules']['anomaly_threshold']:
-            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above inspect threshold")
-        if interval_width > decision_params['inspect_rules']['uncertainty_threshold']:
-            triggers.append(f"Uncertainty width ({interval_width:.0f}) above inspect threshold")
+        if rul_lower < inspect_rul_threshold:
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rul_threshold})")
+        if prob_h30 > inspect_prob_threshold:
+            triggers.append(
+                f"Failure probability ({prob_h30:.1%}) above inspect threshold ({inspect_prob_threshold:.0%})")
+        if anomaly_score > inspect_anomaly_threshold:
+            triggers.append(
+                f"Anomaly score ({anomaly_score:.1f}) above inspect threshold ({inspect_anomaly_threshold})")
+        if interval_width > inspect_uncertainty_threshold:
+            triggers.append(
+                f"Uncertainty width ({interval_width:.0f}) above inspect threshold ({inspect_uncertainty_threshold})")
 
         return {
             'action': 'INSPECT',
