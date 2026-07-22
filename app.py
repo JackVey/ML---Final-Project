@@ -51,13 +51,11 @@ def load_artifacts():
 
 @st.cache_data
 def load_raw_data(dataset):
-    dataset_num = dataset[-1]
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
-                                                                                     range(1, 22)]
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in range(1, 22)]
 
-    train_df = pd.read_csv(f'data/train_FD{dataset_num}.txt', sep=r'\s+', header=None, names=col_names)
-    test_df = pd.read_csv(f'data/test_FD{dataset_num}.txt', sep=r'\s+', header=None, names=col_names)
-    rul_df = pd.read_csv(f'data/RUL_FD{dataset_num}.txt', sep=r'\s+', header=None, names=['RUL_final'])
+    train_df = pd.read_csv(f'data/train_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
+    test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
+    rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
 
     return train_df, test_df, rul_df
 
