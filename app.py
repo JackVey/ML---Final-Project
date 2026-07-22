@@ -600,6 +600,12 @@ def load_artifacts():
         artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
         artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
 
+        # ====== DEBUG: Check loaded decision_params ======
+        if dataset == 'FD001':
+            st.write(f"### DEBUG: Loaded decision_params for {dataset}")
+            st.json(artifacts[dataset]['decision_params'])
+        # ====== END DEBUG ======
+
         if 'feature_names' in ds_info:
             artifacts[dataset]['feature_names'] = joblib.load(f'saved_artifacts/{ds_info["feature_names"]}')
         else:
