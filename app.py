@@ -38,7 +38,11 @@ def load_artifacts():
         artifacts[dataset]['tuned_thresholds'] = joblib.load(f'saved_artifacts/{ds_info["tuned_thresholds"]}')
         artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
         artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
-        artifacts[dataset]['feature_names'] = joblib.load(f'saved_artifacts/{ds_info["feature_names"]}')
+
+        if 'feature_names' in ds_info:
+            artifacts[dataset]['feature_names'] = joblib.load(f'saved_artifacts/{ds_info["feature_names"]}')
+        else:
+            artifacts[dataset]['feature_names'] = None
 
         with open(f'saved_artifacts/{ds_info["metadata"]}', 'r') as f:
             artifacts[dataset]['metadata'] = json.load(f)
@@ -138,11 +142,11 @@ def predict_rul(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     model = ds_artifacts['xgb_model']
     conformal_params = ds_artifacts['conformal_params']
-    feature_names = ds_artifacts['feature_names']
 
-    expected_features = feature_names['all_features']
-    if len(features) != len(expected_features):
-        features = features[:len(expected_features)]
+    if ds_artifacts['feature_names'] is not None:
+        expected_features = ds_artifacts['feature_names']['all_features']
+        if len(features) != len(expected_features):
+            features = features[:len(expected_features)]
 
     pred = model.predict(features.reshape(1, -1))[0]
     pred_capped = np.clip(pred, None, 125)
@@ -165,11 +169,11 @@ def predict_failure_risk(features, dataset, artifacts):
     calibrated_models = ds_artifacts['calibrated_models']
     tuned_thresholds = ds_artifacts['tuned_thresholds']
     horizons = [10, 20, 30]
-    feature_names = ds_artifacts['feature_names']
 
-    expected_features = feature_names['all_features']
-    if len(features) != len(expected_features):
-        features = features[:len(expected_features)]
+    if ds_artifacts['feature_names'] is not None:
+        expected_features = ds_artifacts['feature_names']['all_features']
+        if len(features) != len(expected_features):
+            features = features[:len(expected_features)]
 
     risks = {}
     for h in horizons:
@@ -188,11 +192,11 @@ def predict_failure_risk(features, dataset, artifacts):
 def predict_anomaly(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     anomaly_models = ds_artifacts['anomaly_models']
-    feature_names = ds_artifacts['feature_names']
 
-    expected_features = feature_names['all_features']
-    if len(features) != len(expected_features):
-        features = features[:len(expected_features)]
+    if ds_artifacts['feature_names'] is not None:
+        expected_features = ds_artifacts['feature_names']['all_features']
+        if len(features) != len(expected_features):
+            features = features[:len(expected_features)]
 
     scores = {}
     for name, model in anomaly_models.items():
@@ -321,16 +325,74 @@ def main():
             st.error("Invalid selection! Please choose a valid cycle.")
             return
 
-        expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
+        with st.expander("Debug Info"):
+            st.write("### Debug Information")
+            st.write(f"Dataset: {selected_dataset}")
 
-        feature_cols = [col for col in processed_df.columns
-                        if col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
-        if 'regime' in processed_df.columns:
-            feature_cols = [col for col in feature_cols if col != 'regime']
+            if artifacts[selected_dataset]['feature_names'] is not None:
+                expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
+                st.write(f"Expected number of features: {len(expected_cols)}")
+                st.write(f"First 10 expected features: {expected_cols[:10]}")
+            else:
+                st.write("No feature_names found in artifacts")
+                expected_cols = []
 
-        feature_cols = [col for col in expected_cols if col in processed_df.columns]
+            processed_cols = [col for col in processed_df.columns if
+                              col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
+            if 'regime' in processed_df.columns:
+                processed_cols = [col for col in processed_cols if col != 'regime']
+
+            st.write(f"Number of available columns in processed_df: {len(processed_cols)}")
+            st.write(f"First 10 available columns: {processed_cols[:10]}")
+
+            if expected_cols:
+                available_expected = [col for col in expected_cols if col in processed_df.columns]
+                missing_expected = [col for col in expected_cols if col not in processed_df.columns]
+                st.write(f"Expected columns available in processed_df: {len(available_expected)}")
+                st.write(f"Missing expected columns: {len(missing_expected)}")
+                if missing_expected:
+                    st.write(f"First 10 missing columns: {missing_expected[:10]}")
+            else:
+                available_expected = processed_cols
+
+            feature_cols = [col for col in available_expected if col in processed_df.columns]
+            st.write(f"Final feature columns count: {len(feature_cols)}")
+
+            features = current_row[feature_cols].values.flatten()
+            st.write(f"Features shape: {features.shape}")
+            st.write(f"Features dtype: {features.dtype}")
+            st.write(f"Features contains NaN: {np.isnan(features).any()}")
+            st.write(f"Features contains inf: {np.isinf(features).any()}")
+
+            if features.dtype == 'object':
+                st.write("Features are object type! Converting to float...")
+                try:
+                    features = features.astype(float)
+                    st.write("Conversion successful")
+                except Exception as e:
+                    st.error(f"Conversion failed: {e}")
+                    st.write("Feature values with issues:")
+                    for i, val in enumerate(features):
+                        if not isinstance(val, (int, float)):
+                            st.write(f"Index {i}: {val} (type: {type(val)})")
+
+        if artifacts[selected_dataset]['feature_names'] is not None:
+            expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
+            available_expected = [col for col in expected_cols if col in processed_df.columns]
+            feature_cols = [col for col in available_expected if col in processed_df.columns]
+        else:
+            feature_cols = [col for col in processed_df.columns
+                            if col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
+            if 'regime' in processed_df.columns:
+                feature_cols = [col for col in feature_cols if col != 'regime']
 
         features = current_row[feature_cols].values.flatten()
+
+        if features.dtype == 'object':
+            try:
+                features = features.astype(float)
+            except:
+                features = np.array([float(x) if isinstance(x, (int, float)) else 0.0 for x in features])
 
         with st.spinner("Making predictions..."):
             rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
