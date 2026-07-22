@@ -214,32 +214,32 @@ def predict_failure_risk(features, dataset, artifacts):
     return risks
 
 
-def predict_anomaly(features, dataset, artifacts):
-    ds_artifacts = artifacts[dataset]
-    anomaly_models = ds_artifacts['anomaly_models']
-
-    if ds_artifacts['feature_names'] is not None:
-        expected_features = ds_artifacts['feature_names']['all_features']
-        if len(features) != len(expected_features):
-            features = features[:len(expected_features)]
-
-    scores = {}
-    for name, model in anomaly_models.items():
-        if name == 'PCA':
-            reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
-            raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
-        else:
-            raw_score = -model.decision_function(features.reshape(1, -1))[0]
-
-        threshold = 95
-
-        scores[name] = {
-            'raw_score': raw_score,
-            'percentile': raw_score,
-            'alert': raw_score >= threshold
-        }
-
-    return scores
+# def predict_anomaly(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     anomaly_models = ds_artifacts['anomaly_models']
+#
+#     if ds_artifacts['feature_names'] is not None:
+#         expected_features = ds_artifacts['feature_names']['all_features']
+#         if len(features) != len(expected_features):
+#             features = features[:len(expected_features)]
+#
+#     scores = {}
+#     for name, model in anomaly_models.items():
+#         if name == 'PCA':
+#             reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
+#             raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
+#         else:
+#             raw_score = -model.decision_function(features.reshape(1, -1))[0]
+#
+#         threshold = 95
+#
+#         scores[name] = {
+#             'raw_score': raw_score,
+#             'percentile': raw_score,
+#             'alert': raw_score >= threshold
+#         }
+#
+#     return scores
 
 
 # def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
@@ -432,6 +432,42 @@ def predict_anomaly(features, dataset, artifacts):
 #             'triggers': ['All parameters within normal range'],
 #             'confidence': 'HIGH'
 #         }
+
+def predict_anomaly(features, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    anomaly_models = ds_artifacts['anomaly_models']
+
+    if ds_artifacts['feature_names'] is not None:
+        expected_features = ds_artifacts['feature_names']['all_features']
+        if len(features) != len(expected_features):
+            features = features[:len(expected_features)]
+
+    scores = {}
+    for name, model in anomaly_models.items():
+        if name == 'PCA':
+            reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
+            raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
+        else:
+            raw_score = -model.decision_function(features.reshape(1, -1))[0]
+
+        threshold = 95
+
+        # ====== FIX: Use raw_score as percentile (temporarily) ======
+        # در حالت ایده‌آل، باید از pct_scores_test استفاده کنید
+        # ولی برای تست، raw_score را به percentiles محدود می‌کنیم
+        if name == 'OCSVM':
+            percentile = max(0, min(100, raw_score + 50))  # تبدیل تقریبی
+        else:
+            percentile = max(0, min(100, raw_score))
+        # ====== END FIX ======
+
+        scores[name] = {
+            'raw_score': raw_score,
+            'percentile': percentile,
+            'alert': raw_score >= threshold
+        }
+
+    return scores
 
 def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
     prob_h30 = failure_risks['h30']['probability']
