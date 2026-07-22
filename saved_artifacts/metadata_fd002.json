@@ -1,0 +1,59 @@
+{
+  "dataset": "FD002",
+  "description": "Six operating conditions - One fault mode (HPC)",
+  "model_version": "v1.0",
+  "training_date": "2026-07-22",
+  "author": "Mohammadreza Amini",
+  "seed": 42,
+  "train_engines": 156,
+  "val_engines": 52,
+  "test_engines": 52,
+  "window_size": 50,
+  "total_features": 150,
+  "dropped_sensors": [],
+  "kept_sensors": [
+    "sensor_1",
+    "sensor_2",
+    "sensor_3",
+    "sensor_4",
+    "sensor_5",
+    "sensor_6",
+    "sensor_7",
+    "sensor_8",
+    "sensor_9",
+    "sensor_10",
+    "sensor_11",
+    "sensor_12",
+    "sensor_13",
+    "sensor_14",
+    "sensor_15",
+    "sensor_16",
+    "sensor_17",
+    "sensor_18",
+    "sensor_19",
+    "sensor_20",
+    "sensor_21"
+  ],
+  "num_regimes": 6,
+  "regression_baselines": [
+    "Ridge",
+    "Polynomial",
+    "Random Forest",
+    "XGBoost"
+  ],
+  "classification_models": [
+    "Logistic Regression",
+    "XGBoost"
+  ],
+  "anomaly_models": [
+    "Isolation Forest",
+    "LOF",
+    "One-Class SVM",
+    "PCA"
+  ],
+  "horizons": [
+    10,
+    20,
+    30
+  ]
+}

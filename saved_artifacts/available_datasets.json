@@ -1,0 +1,28 @@
+{
+  "FD001": {
+    "scaler": "scaler_fd001.joblib",
+    "xgb_model": "xgb_win_model_fd001.joblib",
+    "calibrated_models": "calibrated_models_fd001.joblib",
+    "anomaly_models": "anomaly_models_fd001.joblib",
+    "feature_info": "feature_info_fd001.joblib",
+    "window_info": "window_info_fd001.joblib",
+    "conformal_params": "conformal_params_fd001.joblib",
+    "tuned_thresholds": "tuned_thresholds_fd001.joblib",
+    "decision_params": "decision_params_fd001.joblib",
+    "metadata": "metadata_fd001.json"
+  },
+  "FD002": {
+    "scaler": "scaler_global_fd002.joblib",
+    "scaler_dict": "scaler_dict_fd002.joblib",
+    "kmeans": "kmeans_fd002.joblib",
+    "xgb_model": "xgb_win_model_fd002.joblib",
+    "calibrated_models": "calibrated_models_fd002.joblib",
+    "anomaly_models": "anomaly_models_fd002.joblib",
+    "feature_info": "feature_info_fd002.joblib",
+    "window_info": "window_info_fd002.joblib",
+    "conformal_params": "conformal_params_fd002.joblib",
+    "tuned_thresholds": "tuned_thresholds_fd002.joblib",
+    "decision_params": "decision_params_fd002.joblib",
+    "metadata": "metadata_fd002.json"
+  }
+}

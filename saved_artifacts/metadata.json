@@ -1,0 +1,61 @@
+{
+  "dataset": "FD001",
+  "description": "One condition (sea level) - One fault mode (HPC)",
+  "model_version": "v1.0",
+  "training_date": "2026-07-22",
+  "author": "Mohammadreza Amini",
+  "seed": 42,
+  "train_engines": 60,
+  "val_engines": 20,
+  "test_engines": 20,
+  "window_size": 30,
+  "total_features": 101,
+  "dropped_sensors": [
+    "sensor_1",
+    "sensor_5",
+    "sensor_6",
+    "sensor_10",
+    "sensor_16",
+    "sensor_18",
+    "sensor_19"
+  ],
+  "kept_sensors": [
+    "sensor_2",
+    "sensor_3",
+    "sensor_4",
+    "sensor_7",
+    "sensor_8",
+    "sensor_9",
+    "sensor_11",
+    "sensor_12",
+    "sensor_13",
+    "sensor_14",
+    "sensor_15",
+    "sensor_17",
+    "sensor_20",
+    "sensor_21"
+  ],
+  "regression_baselines": [
+    "Ridge",
+    "Polynomial",
+    "Random Forest",
+    "XGBoost"
+  ],
+  "classification_models": [
+    "Logistic Regression",
+    "XGBoost"
+  ],
+  "anomaly_models": [
+    "Isolation Forest",
+    "LOF",
+    "One-Class SVM",
+    "PCA"
+  ],
+  "best_rmse": 29.43,
+  "best_mae": 21.43,
+  "class_balance": {
+    "h10": 5.4,
+    "h20": 10.3,
+    "h30": 15.2
+  }
+}
