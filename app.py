@@ -3,244 +3,483 @@ import pandas as pd
 import numpy as np
 import joblib
 import json
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from pathlib import Path
+import warnings
 
-st.set_page_config(page_title="Equipment Health Monitoring", layout="wide")
+warnings.filterwarnings('ignore')
+
+st.set_page_config(
+    page_title="Jet Engine Early Warning System",
+    page_icon="🛩️",
+    layout="wide"
+)
 
 
 @st.cache_resource
-def load_all_artifacts():
-    try:
-        with open('saved_artifacts/pipeline_metadata.json', 'r') as f:
-            metadata = json.load(f)
-    except:
-        metadata = None
+def load_artifacts():
+    artifacts = {}
 
-    try:
-        scaler_fd001 = joblib.load('saved_artifacts/scaler_fd001.joblib')
-    except:
-        scaler_fd001 = None
+    with open('saved_artifacts/available_datasets.json', 'r') as f:
+        artifacts['available_datasets'] = json.load(f)
 
-    try:
-        xgb_win_model = joblib.load('saved_artifacts/xgb_win_model.joblib')
-    except:
-        xgb_win_model = None
+    for dataset in ['FD001', 'FD002']:
+        artifacts[dataset] = {}
+        ds_info = artifacts['available_datasets'][dataset]
 
-    try:
-        calibrated_models = joblib.load('saved_artifacts/calibrated_models.joblib')
-    except:
-        calibrated_models = None
+        artifacts[dataset]['scaler'] = joblib.load(f'saved_artifacts/{ds_info["scaler"]}')
+        artifacts[dataset]['xgb_model'] = joblib.load(f'saved_artifacts/{ds_info["xgb_model"]}')
+        artifacts[dataset]['calibrated_models'] = joblib.load(f'saved_artifacts/{ds_info["calibrated_models"]}')
+        artifacts[dataset]['anomaly_models'] = joblib.load(f'saved_artifacts/{ds_info["anomaly_models"]}')
+        artifacts[dataset]['feature_info'] = joblib.load(f'saved_artifacts/{ds_info["feature_info"]}')
+        artifacts[dataset]['window_info'] = joblib.load(f'saved_artifacts/{ds_info["window_info"]}')
+        artifacts[dataset]['conformal_params'] = joblib.load(f'saved_artifacts/{ds_info["conformal_params"]}')
+        artifacts[dataset]['tuned_thresholds'] = joblib.load(f'saved_artifacts/{ds_info["tuned_thresholds"]}')
+        artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
+        artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
 
-    try:
-        models_unsupervised = joblib.load('saved_artifacts/models_unsupervised.joblib')
-    except:
-        models_unsupervised = None
+        with open(f'saved_artifacts/{ds_info["metadata"]}', 'r') as f:
+            artifacts[dataset]['metadata'] = json.load(f)
 
-    return metadata, scaler_fd001, xgb_win_model, calibrated_models, models_unsupervised
+        if dataset == 'FD002':
+            artifacts[dataset]['scaler_dict'] = joblib.load(f'saved_artifacts/{ds_info["scaler_dict"]}')
+            artifacts[dataset]['kmeans'] = joblib.load(f'saved_artifacts/{ds_info["kmeans"]}')
 
-
-metadata, scaler, xgb_model, calib_models, unsup_model = load_all_artifacts()
+    return artifacts
 
 
-def run_prediction_pipeline(df_input):
-    feature_cols = [c for c in df_input.columns if c not in ['engine_id', 'cycle']]
-    X_sample = df_input[feature_cols].values
+@st.cache_data
+def load_raw_data(dataset):
+    dataset_num = dataset[-1]
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
+                                                                                     range(1, 22)]
 
-    if scaler is not None:
-        try:
-            X_scaled = scaler.transform(X_sample)
-        except:
-            X_scaled = X_sample
+    train_df = pd.read_csv(f'data/train_FD{dataset_num}.txt', sep=r'\s+', header=None, names=col_names)
+    test_df = pd.read_csv(f'data/test_FD{dataset_num}.txt', sep=r'\s+', header=None, names=col_names)
+    rul_df = pd.read_csv(f'data/RUL_FD{dataset_num}.txt', sep=r'\s+', header=None, names=['RUL_final'])
+
+    return train_df, test_df, rul_df
+
+
+def calculate_slope_app(y, window_size):
+    result = np.full_like(y, 0.0, dtype=float)
+    for i in range(len(y)):
+        start = max(0, i - window_size + 1)
+        x = np.arange(start, i + 1)
+        if len(x) > 1:
+            coeffs = np.polyfit(x, y[start:i + 1], 1)
+            result[i] = coeffs[0]
+    return result
+
+
+def extract_window_features(df, window_info, feature_cols):
+    W = window_info['window_size']
+    df_out = df.copy()
+    grouped = df_out.groupby('engine_id')
+
+    for col in feature_cols:
+        rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+        df_out[f'{col}_roll_mean'] = rolling_obj.mean().reset_index(level=0, drop=True)
+        df_out[f'{col}_roll_std'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+        df_out[f'{col}_roll_min'] = rolling_obj.min().reset_index(level=0, drop=True)
+        df_out[f'{col}_roll_max'] = rolling_obj.max().reset_index(level=0, drop=True)
+        df_out[f'{col}_slope'] = df_out.groupby('engine_id')[col].transform(
+            lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0
+        )
+
+    return df_out
+
+
+def preprocess_data(dataset, test_df, rul_df, artifacts):
+    ds_artifacts = artifacts[dataset]
+
+    test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+    rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+
+    test_df['max_cycle'] = test_df['engine_id'].map(test_max_cycle)
+    test_df['RUL_final'] = test_df['engine_id'].map(rul_mapping)
+    test_df['RUL'] = test_df['max_cycle'] - test_df['cycle'] + test_df['RUL_final']
+
+    rul_cap = 125
+    test_df['RUL_capped'] = test_df['RUL'].clip(upper=rul_cap)
+
+    dropped_sensors = ds_artifacts['feature_info'].get('dropped_sensors', [])
+    if dataset == 'FD001':
+        dropped_sensors = artifacts['FD001']['metadata']['dropped_sensors']
     else:
-        X_scaled = X_sample
+        dropped_sensors = artifacts['FD002']['metadata']['dropped_sensors']
 
-    rul_preds = xgb_model.predict(X_scaled)
+    if dropped_sensors:
+        test_df = test_df.drop(columns=dropped_sensors)
 
-    if unsup_model is not None:
-        try:
-            if hasattr(unsup_model, "decision_function"):
-                anomaly_scores = -unsup_model.decision_function(X_scaled)
-            elif hasattr(unsup_model, "score_samples"):
-                anomaly_scores = -unsup_model.score_samples(X_scaled)
-            else:
-                anomaly_scores = unsup_model.predict(X_scaled)
-        except:
-            anomaly_scores = np.random.uniform(0.1, 2.5, size=len(df_input))
+    feature_info = ds_artifacts['feature_info']
+    features_to_scale = feature_info['all_features']
+    scaler = ds_artifacts['scaler']
+
+    if dataset == 'FD001':
+        test_df[features_to_scale] = scaler.transform(test_df[features_to_scale])
     else:
-        anomaly_scores = np.random.uniform(0.1, 2.5, size=len(df_input))
+        op_settings = feature_info['op_settings']
+        test_df[op_settings] = scaler.transform(test_df[op_settings])
 
-    risk_10_list = []
-    risk_30_list = []
-    for i in range(len(df_input)):
-        row_feat = X_scaled[i:i + 1]
-        p10, p30 = 0.0, 0.0
+        sensor_cols = feature_info['active_sensors']
+        scaler_dict = ds_artifacts['scaler_dict']
+        kmeans = ds_artifacts['kmeans']
 
-        if isinstance(calib_models, dict):
-            if 'rf_horizon_10' in calib_models:
-                p10 = calib_models['rf_horizon_10'].predict_proba(row_feat)[0][1]
-            if 'rf_horizon_30' in calib_models:
-                p30 = calib_models['rf_horizon_30'].predict_proba(row_feat)[0][1]
+        test_df['regime'] = kmeans.predict(test_df[op_settings])
+
+        for r in range(6):
+            regime_mask = test_df['regime'] == r
+            if regime_mask.sum() > 0 and r in scaler_dict:
+                test_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(test_df.loc[regime_mask, sensor_cols])
+
+    window_info = ds_artifacts['window_info']
+    feature_cols = window_info['feature_cols']
+    test_df = extract_window_features(test_df, window_info, feature_cols)
+
+    return test_df
+
+
+def predict_rul(features, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    model = ds_artifacts['xgb_model']
+    conformal_params = ds_artifacts['conformal_params']
+
+    pred = model.predict(features.reshape(1, -1))[0]
+    pred_capped = np.clip(pred, None, 125)
+
+    if pred_capped <= 50:
+        q = conformal_params['q_95_near_failure']
+    elif pred_capped <= 100:
+        q = conformal_params['q_95_mid_life']
+    else:
+        q = conformal_params['q_95_early_life']
+
+    lower = max(0, pred_capped - q)
+    upper = pred_capped + q
+
+    return pred_capped, lower, upper
+
+
+def predict_failure_risk(features, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    calibrated_models = ds_artifacts['calibrated_models']
+    tuned_thresholds = ds_artifacts['tuned_thresholds']
+    horizons = [10, 20, 30]
+
+    risks = {}
+    for h in horizons:
+        model = calibrated_models[h]['XGBoost']
+        prob = model.predict_proba(features.reshape(1, -1))[0, 1]
+        threshold = tuned_thresholds[h]['XGBoost']
+        risks[f'h{h}'] = {
+            'probability': prob,
+            'threshold': threshold,
+            'alert': prob >= threshold
+        }
+
+    return risks
+
+
+def predict_anomaly(features, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    anomaly_models = ds_artifacts['anomaly_models']
+
+    scores = {}
+    for name, model in anomaly_models.items():
+        if name == 'PCA':
+            reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
+            raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
         else:
-            p10 = 0.95 if rul_preds[i] <= 15 else 0.05
-            p30 = 0.85 if rul_preds[i] <= 40 else 0.10
+            raw_score = -model.decision_function(features.reshape(1, -1))[0]
 
-        risk_10_list.append(p10)
-        risk_30_list.append(p30)
+        threshold = 95
 
-    statuses = []
-    for i in range(len(df_input)):
-        r_val = rul_preds[i]
-        p10_val = risk_10_list[i]
-        p30_val = risk_30_list[i]
-        a_val = anomaly_scores[i]
+        scores[name] = {
+            'raw_score': raw_score,
+            'percentile': raw_score,
+            'alert': raw_score >= threshold
+        }
 
-        if r_val <= 15 or p10_val > 0.7:
-            statuses.append("STOP")
-        elif r_val <= 40 or p30_val > 0.6 or a_val > 1.8:
-            statuses.append("INSPECT")
-        else:
-            statuses.append("CONTINUE")
-
-    engine_ids = df_input['engine_id'].values if 'engine_id' in df_input.columns else ["Manual"] * len(df_input)
-    cycles = df_input['cycle'].values if 'cycle' in df_input.columns else ["Manual"] * len(df_input)
-
-    results_df = pd.DataFrame({
-        'Engine ID': engine_ids,
-        'Cycle': cycles,
-        'Predicted RUL': np.round(rul_preds, 2),
-        'Risk (10 Cycles)': [f"{p * 100:.1f}%" for p in risk_10_list],
-        'Risk (30 Cycles)': [f"{p * 100:.1f}%" for p in risk_30_list],
-        'Anomaly Score': np.round(anomaly_scores, 3),
-        'Action Status': statuses
-    })
-
-    return results_df
+    return scores
 
 
-st.title("Turbine Predictive Maintenance Dashboard")
-st.markdown("---")
+def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    decision_params = ds_artifacts['decision_params']
 
-tab1, tab2 = st.tabs(["Test Data Analysis (Batch/File)", "Manual Engine Inspection"])
+    prob_h30 = failure_risks['h30']['probability']
+    anomaly_score = anomaly_scores['OCSVM']['percentile']
+    interval_width = rul_upper - rul_lower
 
-with tab1:
-    st.header("Test Data Analysis")
-    uploaded_file = st.file_uploader("Upload test file (.txt or .csv)", type=["csv", "txt"])
+    if rul_lower < decision_params['stop_rules']['rul_lower_bound'] or prob_h30 > decision_params['stop_rules'][
+        'failure_prob_threshold'] or anomaly_score > decision_params['stop_rules']['anomaly_threshold']:
+        triggers = []
+        if rul_lower < decision_params['stop_rules']['rul_lower_bound']:
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold")
+        if prob_h30 > decision_params['stop_rules']['failure_prob_threshold']:
+            triggers.append(f"Failure probability ({prob_h30:.1%}) above critical threshold")
+        if anomaly_score > decision_params['stop_rules']['anomaly_threshold']:
+            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold")
 
-    if uploaded_file is not None:
-        columns = ['engine_id', 'cycle', 'setting_1', 'setting_2', 'setting_3'] + [f's_{i}' for i in range(1, 22)]
-        try:
-            df_uploaded = pd.read_csv(uploaded_file, sep=r'\s+', header=None, names=columns)
-        except:
-            uploaded_file.seek(0)
-            df_uploaded = pd.read_csv(uploaded_file)
+        return {
+            'action': 'STOP',
+            'color': 'red',
+            'triggers': triggers,
+            'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
+        }
 
-        st.success("File uploaded successfully.")
+    elif rul_lower < decision_params['inspect_rules']['rul_lower_bound'] or prob_h30 > decision_params['inspect_rules'][
+        'failure_prob_threshold'] or anomaly_score > decision_params['inspect_rules'][
+        'anomaly_threshold'] or interval_width > decision_params['inspect_rules']['uncertainty_threshold']:
+        triggers = []
+        if rul_lower < decision_params['inspect_rules']['rul_lower_bound']:
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold")
+        if prob_h30 > decision_params['inspect_rules']['failure_prob_threshold']:
+            triggers.append(f"Failure probability ({prob_h30:.1%}) above inspect threshold")
+        if anomaly_score > decision_params['inspect_rules']['anomaly_threshold']:
+            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above inspect threshold")
+        if interval_width > decision_params['inspect_rules']['uncertainty_threshold']:
+            triggers.append(f"Uncertainty width ({interval_width:.0f}) above inspect threshold")
 
-        col1, col2 = st.columns(2)
+        return {
+            'action': 'INSPECT',
+            'color': 'orange',
+            'triggers': triggers,
+            'confidence': 'MEDIUM'
+        }
+
+    else:
+        return {
+            'action': 'CONTINUE',
+            'color': 'green',
+            'triggers': ['All parameters within normal range'],
+            'confidence': 'HIGH'
+        }
+
+
+def get_dataset_description(dataset):
+    descriptions = {
+        'FD001': '1 condition, 1 fault mode',
+        'FD002': '6 conditions, 1 fault mode'
+    }
+    return descriptions.get(dataset, '')
+
+
+def main():
+    st.title("Jet Engine Early Warning System")
+    st.caption("Predictive Maintenance Dashboard for NASA C-MAPSS Turbofan Engines")
+
+    with st.spinner("Loading model artifacts..."):
+        artifacts = load_artifacts()
+
+    with st.sidebar:
+        st.header("Engine Configuration")
+
+        available_datasets = ['FD001', 'FD002']
+        selected_dataset = st.selectbox(
+            "Select Dataset",
+            available_datasets,
+            format_func=lambda x: f"{x} - {get_dataset_description(x)}"
+        )
+
+        with st.spinner(f"Loading {selected_dataset} data..."):
+            train_df, test_df, rul_df = load_raw_data(selected_dataset)
+            processed_df = preprocess_data(selected_dataset, test_df, rul_df, artifacts)
+
+        engines = sorted(processed_df['engine_id'].unique())
+        selected_engine = st.selectbox(
+            "Select Engine ID",
+            engines,
+            format_func=lambda x: f"Engine #{x}"
+        )
+
+        engine_data = processed_df[processed_df['engine_id'] == selected_engine]
+        cycles = sorted(engine_data['cycle'].unique())
+        selected_cycle = st.slider(
+            "Select Cycle",
+            min_value=min(cycles),
+            max_value=max(cycles),
+            value=max(cycles),
+            step=1
+        )
+
+        predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
+
+    if predict_button:
+        current_row = engine_data[engine_data['cycle'] == selected_cycle]
+        if len(current_row) == 0:
+            st.error("Invalid selection! Please choose a valid cycle.")
+            return
+
+        feature_cols = [col for col in processed_df.columns
+                        if col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
+        if 'regime' in processed_df.columns:
+            feature_cols = [col for col in feature_cols if col != 'regime']
+
+        features = current_row[feature_cols].values.flatten()
+
+        with st.spinner("Making predictions..."):
+            rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
+            risks = predict_failure_risk(features, selected_dataset, artifacts)
+            anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
+            recommendation = make_recommendation(
+                rul_pred, rul_lower, rul_upper,
+                risks, anomaly_scores, selected_dataset, artifacts
+            )
+
+        st.subheader("Current Engine Status")
+
+        col1, col2, col3, col4 = st.columns(4)
+
         with col1:
-            engine_list = sorted(df_uploaded['engine_id'].unique())
-            selected_engine = st.selectbox("Select Engine ID:", engine_list)
+            st.metric(
+                "Remaining Useful Life",
+                f"{rul_pred:.0f} cycles",
+                delta=f"95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]"
+            )
 
         with col2:
-            min_cycle = int(df_uploaded[df_uploaded['engine_id'] == selected_engine]['cycle'].min())
-            max_cycle = int(df_uploaded[df_uploaded['engine_id'] == selected_engine]['cycle'].max())
+            prob_h30 = risks['h30']['probability']
+            st.metric(
+                "Failure Risk (30 cycles)",
+                f"{prob_h30:.1%}",
+                delta=f"Threshold: {risks['h30']['threshold']:.2f}"
+            )
 
-            if min_cycle == max_cycle:
-                selected_cycle_range = (min_cycle, max_cycle)
-                st.info(f"Only one cycle ({min_cycle}) available for this engine.")
-            else:
-                selected_cycle_range = st.slider("Select Cycle Range:", min_value=min_cycle, max_value=max_cycle,
-                                                 value=(min_cycle, max_cycle))
+        with col3:
+            anomaly_score = anomaly_scores['OCSVM']['percentile']
+            st.metric(
+                "Anomaly Score",
+                f"{anomaly_score:.1f}th percentile",
+                delta="Critical > 95%"
+            )
 
-        df_filtered = df_uploaded[
-            (df_uploaded['engine_id'] == selected_engine) &
-            (df_uploaded['cycle'] >= selected_cycle_range[0]) &
-            (df_uploaded['cycle'] <= selected_cycle_range[1])
-            ].copy()
+        with col4:
+            color = recommendation['color']
+            st.markdown(f"""
+            <div style="padding: 15px; border-radius: 10px; background-color: {color}; text-align: center;">
+                <h2 style="color: white; margin: 0; font-size: 24px;">{recommendation['action']}</h2>
+                <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">Confidence: {recommendation['confidence']}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.write(f"Filtered rows: **{len(df_filtered)}**")
+        st.subheader("Failure Risk by Horizon")
 
-        if st.button("Run Prediction Pipeline", type="primary", key="run_tab1"):
-            if len(df_filtered) > 0:
-                results_df = run_prediction_pipeline(df_filtered)
+        col1, col2, col3 = st.columns(3)
+        for i, h in enumerate([10, 20, 30]):
+            with [col1, col2, col3][i]:
+                prob = risks[f'h{h}']['probability']
+                alert = risks[f'h{h}']['alert']
+                st.metric(
+                    f"Risk in {h} cycles",
+                    f"{prob:.1%}",
+                    delta="ALERT" if alert else "Normal"
+                )
 
-                status_order = {'STOP': 0, 'INSPECT': 1, 'CONTINUE': 2}
-                results_df['sort_key'] = results_df['Action Status'].map(status_order)
-                results_df = results_df.sort_values(by=['sort_key', 'Predicted RUL']).drop(columns=['sort_key'])
+        st.subheader("Anomaly Detection Results")
 
-                st.subheader("Model Diagnostic Results")
+        anomaly_data = []
+        for name, scores in anomaly_scores.items():
+            anomaly_data.append({
+                'Method': name,
+                'Score': f"{scores['percentile']:.1f}th percentile",
+                'Status': 'ALERT' if scores['alert'] else 'Normal'
+            })
+        st.dataframe(pd.DataFrame(anomaly_data), hide_index=True, use_container_width=True)
 
-                stop_count = (results_df['Action Status'] == 'STOP').sum()
-                inspect_count = (results_df['Action Status'] == 'INSPECT').sum()
-                continue_count = (results_df['Action Status'] == 'CONTINUE').sum()
+        st.subheader("Decision Triggers")
 
-                m1, m2, m3 = st.columns(3)
-                m1.metric("STOP Count", stop_count)
-                m2.metric("INSPECT Count", inspect_count)
-                m3.metric("CONTINUE Count", continue_count)
-
-                st.dataframe(results_df, use_container_width=True)
-
-                st.line_chart(results_df.set_index('Cycle')['Predicted RUL'])
-            else:
-                st.warning("No data found for the selected filters.")
-
-with tab2:
-    st.header("Manual Engine Inspection")
-    st.write("Enter parameters below to retrieve system evaluation.")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        engine_model_type = st.selectbox("Select Engine Model:",
-                                         ["Turbine-X100 (Standard)", "Aero-Z200 (Heavy Duty)", "CFM-56 (Classic)"])
-    with c2:
-        manual_cycle = st.number_input("Current Cycle:", min_value=1, max_value=1000, value=150)
-
-    base_features = {
-        'setting_1': -0.0001, 'setting_2': 0.0000, 'setting_3': 100.0,
-        's_1': 518.67, 's_2': 642.5, 's_3': 1588.0, 's_4': 1405.0, 's_5': 14.62,
-        's_6': 21.61, 's_7': 553.5, 's_8': 2388.0, 's_9': 9050.0, 's_10': 1.30,
-        's_11': 47.4, 's_12': 521.5, 's_13': 2388.0, 's_14': 8130.0, 's_15': 8.42,
-        's_16': 0.03, 's_17': 393, 's_18': 2388, 's_19': 100.00, 's_20': 38.9, 's_21': 23.3
-    }
-
-    degradation_factor = manual_cycle * 0.01
-    base_features['s_4'] += (degradation_factor * 2)
-    base_features['s_11'] += (degradation_factor * 0.05)
-    base_features['s_15'] += (degradation_factor * 0.01)
-
-    with st.expander("View / Edit Sensor Parameters (Advanced)"):
-        st.info("Values are initialized based on current cycle. Modify manually if needed.")
-        f_cols = st.columns(4)
-        user_features = {}
-        for idx, (feat_name, val) in enumerate(base_features.items()):
-            col_idx = idx % 4
-            user_features[feat_name] = f_cols[col_idx].number_input(feat_name, value=float(val), format="%.4f")
-
-    if st.button("Evaluate System", type="primary", key="run_tab2"):
-        if xgb_model is None:
-            st.error("Models not loaded. Verify saved_artifacts directory.")
+        triggers = recommendation['triggers']
+        if len(triggers) > 1:
+            st.warning("Active triggers:")
+            for trigger in triggers:
+                st.write(f"- {trigger}")
         else:
-            manual_data = {'engine_id': [engine_model_type], 'cycle': [manual_cycle]}
-            manual_data.update({k: [v] for k, v in user_features.items()})
-            df_manual = pd.DataFrame(manual_data)
+            st.success(triggers[0])
 
-            res_manual = run_prediction_pipeline(df_manual)
+        st.subheader("Engine Health Timeline")
 
-            action = res_manual['Action Status'].iloc[0]
-            rul = res_manual['Predicted RUL'].iloc[0]
-            r10 = res_manual['Risk (10 Cycles)'].iloc[0]
-            r30 = res_manual['Risk (30 Cycles)'].iloc[0]
+        sensor_cols = [col for col in processed_df.columns if 'sensor_' in col and col != 'sensor_1']
+        sensor_cols = [col for col in sensor_cols if
+                       col not in artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])]
 
-            st.markdown("### Analysis Summary")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            selected_sensor = st.selectbox(
+                "Select Sensor to Visualize",
+                sensor_cols if sensor_cols else ['sensor_2']
+            )
+        with col2:
+            show_health = st.checkbox("Show Health Features", value=False)
 
-            if action == "STOP":
-                st.error(f"Critical Status (STOP) | Predicted RUL: {rul} cycles")
-            elif action == "INSPECT":
-                st.warning(f"Inspection Required (INSPECT) | Predicted RUL: {rul} cycles")
-            else:
-                st.success(f"Normal Operation (CONTINUE) | Predicted RUL: {rul} cycles")
+        if show_health:
+            fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
+                                vertical_spacing=0.15)
 
-            col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("Failure Probability (10 Cycles)", r10)
-            col_m2.metric("Failure Probability (30 Cycles)", r30)
-            col_m3.metric("Anomaly Score", res_manual['Anomaly Score'].iloc[0])
+            fig.add_trace(
+                go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='True RUL',
+                           line=dict(color='green', width=2)),
+                row=1, col=1
+            )
+            fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
+
+            anomaly_col = 'OCSVM_Anomaly_Score'
+            if anomaly_col in engine_data.columns:
+                fig.add_trace(
+                    go.Scatter(x=engine_data['cycle'], y=engine_data[anomaly_col], mode='lines', name='Anomaly Score',
+                               line=dict(color='orange', width=2)),
+                    row=2, col=1
+                )
+                fig.add_hline(y=95, line_dash="dash", line_color="red", annotation_text="Critical", row=2, col=1)
+                fig.add_hline(y=90, line_dash="dot", line_color="orange", annotation_text="Warning", row=2, col=1)
+
+            fig.update_layout(height=500, showlegend=True)
+
+        else:
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(x=engine_data['cycle'], y=engine_data[selected_sensor], mode='lines', name=selected_sensor,
+                           line=dict(color='blue', width=2))
+            )
+
+            fig.add_trace(
+                go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='RUL',
+                           line=dict(color='green', width=2, dash='dot'), yaxis='y2')
+            )
+
+            fig.update_layout(
+                yaxis=dict(title=selected_sensor),
+                yaxis2=dict(title='RUL', overlaying='y', side='right'),
+                height=400,
+                showlegend=True
+            )
+
+        fig.add_vline(x=selected_cycle, line_dash="dash", line_color="red", annotation_text="Current Cycle",
+                      annotation_position="top")
+        st.plotly_chart(fig, use_container_width=True)
+
+        with st.expander("Model Metadata"):
+            metadata = artifacts[selected_dataset]['metadata']
+            rul_params = artifacts[selected_dataset]['rul_params']
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Dataset Information**")
+                st.write(f"- Dataset: {metadata.get('dataset', 'N/A')}")
+                st.write(f"- Description: {metadata.get('description', 'N/A')}")
+                st.write(f"- Training Date: {metadata.get('training_date', 'N/A')}")
+                st.write(f"- Author: {metadata.get('author', 'N/A')}")
+            with col2:
+                st.write("**Model Configuration**")
+                st.write(f"- Model Version: {metadata.get('model_version', 'N/A')}")
+                st.write(f"- Window Size: {metadata.get('window_size', 'N/A')} cycles")
+                st.write(f"- RUL Cap: {rul_params.get('rul_cap', 125)} cycles")
+                st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
+                if selected_dataset == 'FD002':
+                    st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
+
+
+if __name__ == "__main__":
+    main()
