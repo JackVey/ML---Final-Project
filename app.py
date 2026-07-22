@@ -131,6 +131,9 @@ def preprocess_data(dataset, test_df, rul_df, artifacts):
 
         test_df['regime'] = kmeans.predict(test_df[op_settings])
 
+        for col in sensor_cols:
+            test_df[col] = test_df[col].astype(float)
+
         for r in range(6):
             regime_mask = test_df['regime'] == r
             if regime_mask.sum() > 0 and r in scaler_dict:
