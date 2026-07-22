@@ -209,7 +209,6 @@ def predict_failure_risk(features, dataset, artifacts):
 
     return risks
 
-
 def predict_anomaly(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     anomaly_models = ds_artifacts['anomaly_models']
@@ -221,6 +220,7 @@ def predict_anomaly(features, dataset, artifacts):
             features = features[:len(expected_features)]
 
     scores = {}
+    raw_scores_debug = {}
     for name, model in anomaly_models.items():
         if name == 'PCA':
             reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
@@ -229,11 +229,11 @@ def predict_anomaly(features, dataset, artifacts):
             raw_score = -model.decision_function(features.reshape(1, -1))[0]
 
         threshold = 95
+        raw_scores_debug[name] = raw_score
 
         if name in pct_scores_test:
             ref_scores = pct_scores_test[name]
             if len(ref_scores) > 0:
-                percentile = np.percentile(ref_scores, 50)
                 if raw_score >= ref_scores.max():
                     percentile = 100.0
                 elif raw_score <= ref_scores.min():
@@ -250,6 +250,11 @@ def predict_anomaly(features, dataset, artifacts):
             'percentile': float(percentile),
             'alert': raw_score >= threshold
         }
+
+    # ====== DEBUG ======
+    st.write("### Debug: Raw Scores for Anomaly Models")
+    st.json(raw_scores_debug)
+    # ====== END DEBUG ======
 
     return scores
 
