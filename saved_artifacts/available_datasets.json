@@ -9,6 +9,7 @@
     "conformal_params": "conformal_params_fd001.joblib",
     "tuned_thresholds": "tuned_thresholds_fd001.joblib",
     "decision_params": "decision_params_fd001.joblib",
+    "rul_params": "rul_params_fd001.joblib",
     "metadata": "metadata_fd001.json"
   },
   "FD002": {
@@ -23,6 +24,7 @@
     "conformal_params": "conformal_params_fd002.joblib",
     "tuned_thresholds": "tuned_thresholds_fd002.joblib",
     "decision_params": "decision_params_fd002.joblib",
+    "rul_params": "rul_params_fd002.joblib",
     "metadata": "metadata_fd002.json"
   }
 }
