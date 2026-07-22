@@ -74,6 +74,7 @@ def extract_window_features(df, window_info, feature_cols):
     for col in feature_cols:
         if col not in df.columns:
             continue
+
         rolling_obj = grouped[col].rolling(window=W, min_periods=1)
         df_out[f'{col}_roll_mean'] = rolling_obj.mean().reset_index(level=0, drop=True)
         df_out[f'{col}_roll_std'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
@@ -82,6 +83,12 @@ def extract_window_features(df, window_info, feature_cols):
         df_out[f'{col}_slope'] = df_out.groupby('engine_id')[col].transform(
             lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0
         )
+
+        df_out[f'{col}_ewma'] = grouped[col].transform(
+            lambda x: x.ewm(span=W, adjust=False).mean()
+        )
+
+        df_out[f'{col}_diff'] = grouped[col].diff().fillna(0)
 
     return df_out
 
@@ -324,57 +331,6 @@ def main():
         if len(current_row) == 0:
             st.error("Invalid selection! Please choose a valid cycle.")
             return
-
-        with st.expander("Debug Info"):
-            st.write("### Debug Information")
-            st.write(f"Dataset: {selected_dataset}")
-
-            if artifacts[selected_dataset]['feature_names'] is not None:
-                expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
-                st.write(f"Expected number of features: {len(expected_cols)}")
-                st.write(f"First 10 expected features: {expected_cols[:10]}")
-            else:
-                st.write("No feature_names found in artifacts")
-                expected_cols = []
-
-            processed_cols = [col for col in processed_df.columns if
-                              col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
-            if 'regime' in processed_df.columns:
-                processed_cols = [col for col in processed_cols if col != 'regime']
-
-            st.write(f"Number of available columns in processed_df: {len(processed_cols)}")
-            st.write(f"First 10 available columns: {processed_cols[:10]}")
-
-            if expected_cols:
-                available_expected = [col for col in expected_cols if col in processed_df.columns]
-                missing_expected = [col for col in expected_cols if col not in processed_df.columns]
-                st.write(f"Expected columns available in processed_df: {len(available_expected)}")
-                st.write(f"Missing expected columns: {len(missing_expected)}")
-                if missing_expected:
-                    st.write(f"First 10 missing columns: {missing_expected[:10]}")
-            else:
-                available_expected = processed_cols
-
-            feature_cols = [col for col in available_expected if col in processed_df.columns]
-            st.write(f"Final feature columns count: {len(feature_cols)}")
-
-            features = current_row[feature_cols].values.flatten()
-            st.write(f"Features shape: {features.shape}")
-            st.write(f"Features dtype: {features.dtype}")
-            st.write(f"Features contains NaN: {np.isnan(features).any()}")
-            st.write(f"Features contains inf: {np.isinf(features).any()}")
-
-            if features.dtype == 'object':
-                st.write("Features are object type! Converting to float...")
-                try:
-                    features = features.astype(float)
-                    st.write("Conversion successful")
-                except Exception as e:
-                    st.error(f"Conversion failed: {e}")
-                    st.write("Feature values with issues:")
-                    for i, val in enumerate(features):
-                        if not isinstance(val, (int, float)):
-                            st.write(f"Index {i}: {val} (type: {type(val)})")
 
         if artifacts[selected_dataset]['feature_names'] is not None:
             expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
