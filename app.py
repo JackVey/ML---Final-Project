@@ -38,12 +38,8 @@ def load_artifacts():
         artifacts[dataset]['tuned_thresholds'] = joblib.load(f'saved_artifacts/{ds_info["tuned_thresholds"]}')
         artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
         artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
-
-        # # ====== DEBUG: Check loaded decision_params ======
-        # if dataset == 'FD001':
-        #     st.write(f"### DEBUG: Loaded decision_params for {dataset}")
-        #     st.json(artifacts[dataset]['decision_params'])
-        # # ====== END DEBUG ======
+        artifacts[dataset]['pct_scores_test'] = joblib.load(f'saved_artifacts/{ds_info["pct_scores_test"]}')
+        artifacts[dataset]['pct_scores_val'] = joblib.load(f'saved_artifacts/{ds_info["pct_scores_val"]}')
 
         if 'feature_names' in ds_info:
             artifacts[dataset]['feature_names'] = joblib.load(f'saved_artifacts/{ds_info["feature_names"]}')
@@ -214,228 +210,10 @@ def predict_failure_risk(features, dataset, artifacts):
     return risks
 
 
-# def predict_anomaly(features, dataset, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#     anomaly_models = ds_artifacts['anomaly_models']
-#
-#     if ds_artifacts['feature_names'] is not None:
-#         expected_features = ds_artifacts['feature_names']['all_features']
-#         if len(features) != len(expected_features):
-#             features = features[:len(expected_features)]
-#
-#     scores = {}
-#     for name, model in anomaly_models.items():
-#         if name == 'PCA':
-#             reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
-#             raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
-#         else:
-#             raw_score = -model.decision_function(features.reshape(1, -1))[0]
-#
-#         threshold = 95
-#
-#         scores[name] = {
-#             'raw_score': raw_score,
-#             'percentile': raw_score,
-#             'alert': raw_score >= threshold
-#         }
-#
-#     return scores
-
-
-# def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#     decision_params = ds_artifacts['decision_params']
-#
-#     prob_h30 = failure_risks['h30']['probability']
-#     anomaly_score = anomaly_scores['OCSVM']['percentile']
-#     interval_width = rul_upper - rul_lower
-#
-#     stop_rul_threshold = decision_params['stop_rules'].get('rul_lower_bound', 20)
-#     stop_prob_threshold = decision_params['stop_rules'].get('failure_prob_threshold', 0.6)
-#     stop_anomaly_threshold = decision_params['stop_rules'].get('anomaly_threshold', 95)
-#
-#     inspect_rul_threshold = decision_params['inspect_rules'].get('rul_lower_bound', 30)
-#     inspect_prob_threshold = decision_params['inspect_rules'].get('failure_prob_threshold', 0.3)
-#     inspect_anomaly_threshold = decision_params['inspect_rules'].get('anomaly_threshold', 90)
-#     inspect_uncertainty_threshold = decision_params['inspect_rules'].get('uncertainty_threshold', 50)
-#
-#     if (rul_lower < stop_rul_threshold or
-#             prob_h30 > stop_prob_threshold or
-#             anomaly_score > stop_anomaly_threshold):
-#
-#         triggers = []
-#         if rul_lower < stop_rul_threshold:
-#             triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rul_threshold})")
-#         if prob_h30 > stop_prob_threshold:
-#             triggers.append(
-#                 f"Failure probability ({prob_h30:.1%}) above critical threshold ({stop_prob_threshold:.0%})")
-#         if anomaly_score > stop_anomaly_threshold:
-#             triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_anomaly_threshold})")
-#
-#         return {
-#             'action': 'STOP',
-#             'color': 'red',
-#             'triggers': triggers,
-#             'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
-#         }
-#
-#     elif (rul_lower < inspect_rul_threshold or
-#           prob_h30 > inspect_prob_threshold or
-#           anomaly_score > inspect_anomaly_threshold or
-#           interval_width > inspect_uncertainty_threshold):
-#
-#         triggers = []
-#         if rul_lower < inspect_rul_threshold:
-#             triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rul_threshold})")
-#         if prob_h30 > inspect_prob_threshold:
-#             triggers.append(
-#                 f"Failure probability ({prob_h30:.1%}) above inspect threshold ({inspect_prob_threshold:.0%})")
-#         if anomaly_score > inspect_anomaly_threshold:
-#             triggers.append(
-#                 f"Anomaly score ({anomaly_score:.1f}) above inspect threshold ({inspect_anomaly_threshold})")
-#         if interval_width > inspect_uncertainty_threshold:
-#             triggers.append(
-#                 f"Uncertainty width ({interval_width:.0f}) above inspect threshold ({inspect_uncertainty_threshold})")
-#
-#         return {
-#             'action': 'INSPECT',
-#             'color': 'orange',
-#             'triggers': triggers,
-#             'confidence': 'MEDIUM'
-#         }
-#
-#     else:
-#         return {
-#             'action': 'CONTINUE',
-#             'color': 'green',
-#             'triggers': ['All parameters within normal range'],
-#             'confidence': 'HIGH'
-#         }
-# def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#     decision_params = ds_artifacts['decision_params']
-#
-#     prob_h30 = failure_risks['h30']['probability']
-#     anomaly_score = anomaly_scores['OCSVM']['percentile']
-#     interval_width = rul_upper - rul_lower
-#
-#     stop_rul_threshold = decision_params['stop_rules'].get('rul_lower_bound', 20)
-#     stop_prob_threshold = decision_params['stop_rules'].get('failure_prob_threshold', 0.6)
-#     stop_anomaly_threshold = decision_params['stop_rules'].get('anomaly_threshold', 95)
-#
-#     inspect_rul_threshold = decision_params['inspect_rules'].get('rul_lower_bound', 30)
-#     inspect_prob_threshold = decision_params['inspect_rules'].get('failure_prob_threshold', 0.3)
-#     inspect_anomaly_threshold = decision_params['inspect_rules'].get('anomaly_threshold', 90)
-#     inspect_uncertainty_threshold = decision_params['inspect_rules'].get('uncertainty_threshold', 50)
-#
-#     # # ====== DEBUG SECTION ======
-#     # st.write("### Debug: Decision Values")
-#     # debug_data = {
-#     #     'Parameter': [
-#     #         'RUL Lower Bound',
-#     #         'Failure Probability (h30)',
-#     #         'Anomaly Score (OCSVM)',
-#     #         'Interval Width',
-#     #         'STOP - RUL threshold',
-#     #         'STOP - Prob threshold',
-#     #         'STOP - Anomaly threshold',
-#     #         'INSPECT - RUL threshold',
-#     #         'INSPECT - Prob threshold',
-#     #         'INSPECT - Anomaly threshold',
-#     #         'INSPECT - Uncertainty threshold'
-#     #     ],
-#     #     'Value': [
-#     #         f"{rul_lower:.0f}",
-#     #         f"{prob_h30:.1%}",
-#     #         f"{anomaly_score:.1f}",
-#     #         f"{interval_width:.0f}",
-#     #         f"{stop_rul_threshold}",
-#     #         f"{stop_prob_threshold:.0%}",
-#     #         f"{stop_anomaly_threshold}",
-#     #         f"{inspect_rul_threshold}",
-#     #         f"{inspect_prob_threshold:.0%}",
-#     #         f"{inspect_anomaly_threshold}",
-#     #         f"{inspect_uncertainty_threshold}"
-#     #     ],
-#     #     'Status': [
-#     #         'OK' if rul_lower >= stop_rul_threshold else '🚨 LOW',
-#     #         'OK' if prob_h30 <= stop_prob_threshold else '🚨 HIGH',
-#     #         'OK' if anomaly_score <= stop_anomaly_threshold else '🚨 HIGH',
-#     #         'OK' if interval_width <= inspect_uncertainty_threshold else '⚠️ WIDE',
-#     #         '-',
-#     #         '-',
-#     #         '-',
-#     #         '-',
-#     #         '-',
-#     #         '-',
-#     #         '-'
-#     #     ]
-#     # }
-#     # st.dataframe(pd.DataFrame(debug_data), hide_index=True, use_container_width=True)
-#     #
-#     # st.write("### Decision Logic")
-#     # st.write(
-#     #     f"**STOP condition:** ({rul_lower:.0f} < {stop_rul_threshold}) or ({prob_h30:.1%} > {stop_prob_threshold:.0%}) or ({anomaly_score:.1f} > {stop_anomaly_threshold})")
-#     # st.write(
-#     #     f"**INSPECT condition:** ({rul_lower:.0f} < {inspect_rul_threshold}) or ({prob_h30:.1%} > {inspect_prob_threshold:.0%}) or ({anomaly_score:.1f} > {inspect_anomaly_threshold}) or ({interval_width:.0f} > {inspect_uncertainty_threshold})")
-#     # # ====== END DEBUG ======
-#
-#     if (rul_lower < stop_rul_threshold or
-#             prob_h30 > stop_prob_threshold or
-#             anomaly_score > stop_anomaly_threshold):
-#
-#         triggers = []
-#         if rul_lower < stop_rul_threshold:
-#             triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rul_threshold})")
-#         if prob_h30 > stop_prob_threshold:
-#             triggers.append(
-#                 f"Failure probability ({prob_h30:.1%}) above critical threshold ({stop_prob_threshold:.0%})")
-#         if anomaly_score > stop_anomaly_threshold:
-#             triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_anomaly_threshold})")
-#
-#         return {
-#             'action': 'STOP',
-#             'color': 'red',
-#             'triggers': triggers,
-#             'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
-#         }
-#
-#     elif (rul_lower < inspect_rul_threshold or
-#           prob_h30 > inspect_prob_threshold or
-#           anomaly_score > inspect_anomaly_threshold or
-#           interval_width > inspect_uncertainty_threshold):
-#
-#         triggers = []
-#         if rul_lower < inspect_rul_threshold:
-#             triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rul_threshold})")
-#         if prob_h30 > inspect_prob_threshold:
-#             triggers.append(
-#                 f"Failure probability ({prob_h30:.1%}) above inspect threshold ({inspect_prob_threshold:.0%})")
-#         if anomaly_score > inspect_anomaly_threshold:
-#             triggers.append(
-#                 f"Anomaly score ({anomaly_score:.1f}) above inspect threshold ({inspect_anomaly_threshold})")
-#         if interval_width > inspect_uncertainty_threshold:
-#             triggers.append(
-#                 f"Uncertainty width ({interval_width:.0f}) above inspect threshold ({inspect_uncertainty_threshold})")
-#
-#         return {
-#             'action': 'INSPECT',
-#             'color': 'orange',
-#             'triggers': triggers,
-#             'confidence': 'MEDIUM'
-#         }
-#
-#     else:
-#         return {
-#             'action': 'CONTINUE',
-#             'color': 'green',
-#             'triggers': ['All parameters within normal range'],
-#             'confidence': 'HIGH'
-#         }
-
 def predict_anomaly(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     anomaly_models = ds_artifacts['anomaly_models']
+    pct_scores_test = ds_artifacts['pct_scores_test']
 
     if ds_artifacts['feature_names'] is not None:
         expected_features = ds_artifacts['feature_names']['all_features']
@@ -452,18 +230,24 @@ def predict_anomaly(features, dataset, artifacts):
 
         threshold = 95
 
-        # ====== FIX: Use raw_score as percentile (temporarily) ======
-        # در حالت ایده‌آل، باید از pct_scores_test استفاده کنید
-        # ولی برای تست، raw_score را به percentiles محدود می‌کنیم
-        if name == 'OCSVM':
-            percentile = max(0, min(100, raw_score + 50))  # تبدیل تقریبی
+        if name in pct_scores_test:
+            ref_scores = pct_scores_test[name]
+            if len(ref_scores) > 0:
+                percentile = np.percentile(ref_scores, 50)
+                if raw_score >= ref_scores.max():
+                    percentile = 100.0
+                elif raw_score <= ref_scores.min():
+                    percentile = 0.0
+                else:
+                    percentile = np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores)))
+            else:
+                percentile = 0.0
         else:
-            percentile = max(0, min(100, raw_score))
-        # ====== END FIX ======
+            percentile = 0.0
 
         scores[name] = {
             'raw_score': raw_score,
-            'percentile': percentile,
+            'percentile': float(percentile),
             'alert': raw_score >= threshold
         }
 
