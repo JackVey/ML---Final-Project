@@ -11,7 +11,9 @@
     "decision_params": "decision_params_fd001.joblib",
     "rul_params": "rul_params_fd001.joblib",
     "feature_names": "feature_names_fd001.joblib",
-    "metadata": "metadata_fd001.json"
+    "metadata": "metadata_fd001.json",
+    "pct_scores_test": "pct_scores_test_fd001.joblib",
+    "pct_scores_val": "pct_scores_val_fd001.joblib"
   },
   "FD002": {
     "scaler": "scaler_global_fd002.joblib",
@@ -27,6 +29,8 @@
     "decision_params": "decision_params_fd002.joblib",
     "rul_params": "rul_params_fd002.joblib",
     "feature_names": "feature_names_fd002.joblib",
-    "metadata": "metadata_fd002.json"
+    "metadata": "metadata_fd002.json",
+    "pct_scores_test": "pct_scores_test_fd002.joblib",
+    "pct_scores_val": "pct_scores_val_fd002.joblib"
   }
 }
