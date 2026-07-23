@@ -220,7 +220,6 @@ def predict_anomaly(features, dataset, artifacts):
             features = features[:len(expected_features)]
 
     scores = {}
-    raw_scores_debug = {}
     for name, model in anomaly_models.items():
         if name == 'PCA':
             reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
@@ -229,32 +228,26 @@ def predict_anomaly(features, dataset, artifacts):
             raw_score = -model.decision_function(features.reshape(1, -1))[0]
 
         threshold = 95
-        raw_scores_debug[name] = raw_score
 
         if name in pct_scores_test:
             ref_scores = pct_scores_test[name]
             if len(ref_scores) > 0:
-                if raw_score >= ref_scores.max():
+                if raw_score >= np.max(ref_scores):
                     percentile = 100.0
-                elif raw_score <= ref_scores.min():
+                elif raw_score <= np.min(ref_scores):
                     percentile = 0.0
                 else:
-                    percentile = np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores)))
+                    percentile = float(np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores))))
             else:
                 percentile = 0.0
         else:
             percentile = 0.0
 
         scores[name] = {
-            'raw_score': raw_score,
+            'raw_score': float(raw_score),
             'percentile': float(percentile),
             'alert': raw_score >= threshold
         }
-
-    # ====== DEBUG ======
-    st.write("### Debug: Raw Scores for Anomaly Models")
-    st.json(raw_scores_debug)
-    # ====== END DEBUG ======
 
     return scores
 
@@ -270,7 +263,7 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
         stop_anomaly_threshold = 97
 
         inspect_rul_threshold = 25
-        inspect_prob_threshold = 0.4
+        inspect_prob_threshold = 0.2
         inspect_anomaly_threshold = 92
         inspect_uncertainty_threshold = 60
     else:
