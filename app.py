@@ -1800,35 +1800,32 @@ def main():
 
     # بعد از پردازش داده‌ها و قبل از predict_button
     # در بخش main، بعد از processed_df
-    with st.expander("🔧 Debug Tools"):
-        debug_engine = st.number_input("Debug Engine ID", value=68, step=1)
-        debug_cycle = st.number_input("Debug Cycle", value=150, step=1)
-        if st.button("Run Debug Comparison"):
-            debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
-
-    # در بخش main، بعد از processed_df و قبل از predict_button
-
-    with st.expander("🔧 Debug Tools"):
-        st.write("Use these tools to debug feature extraction and scaling")
-
-        debug_engine = st.number_input("Debug Engine ID", value=68, step=1, key="debug_engine")
-        debug_cycle = st.number_input("Debug Cycle", value=150, step=1, key="debug_cycle")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Run Scaling Debug", key="debug_scaling_btn"):
-                debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
-        with col2:
-            if st.button("Run Feature Comparison", key="debug_features_btn"):
-                debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
-
     # در بخش Debug Tools
     with st.expander("🔧 Debug Tools"):
-        debug_engine = st.number_input("Debug Engine ID", value=68, step=1)
-        debug_cycle = st.number_input("Debug Cycle", value=150, step=1)
+        col1, col2 = st.columns(2)
+        with col1:
+            debug_engine = st.number_input(
+                "Debug Engine ID",
+                value=68,
+                step=1,
+                key="debug_engine_input"  # ← کلید یکتا
+            )
+        with col2:
+            debug_cycle = st.number_input(
+                "Debug Cycle",
+                value=150,
+                step=1,
+                key="debug_cycle_input"  # ← کلید یکتا
+            )
 
-        if st.button("Run Step-by-Step Debug"):
+        if st.button("Run Step-by-Step Debug", key="debug_step_btn"):
             debug_preprocessing_steps(selected_dataset, debug_engine, debug_cycle, artifacts)
+
+        if st.button("Run Scaling Debug", key="debug_scaling_btn"):
+            debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+
+        if st.button("Run Feature Comparison", key="debug_feature_btn"):
+            debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
 
 
 if __name__ == "__main__":
