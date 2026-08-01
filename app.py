@@ -912,7 +912,11 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
-    sensor_cols = sorted(sensor_cols)
+    # ==========================================
+    # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
+    # ==========================================
+    sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
+    # ==========================================
 
     if dataset == 'FD001':
         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
