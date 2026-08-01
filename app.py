@@ -1191,6 +1191,92 @@ def initialize_session_state():
     if 'artifacts' not in st.session_state:
         st.session_state.artifacts = None
 
+def debug_features(processed_df, selected_cycle, selected_dataset, artifacts):
+    """دیباگ: مقایسه ویژگی‌های استخراج شده با نوت‌بوک"""
+
+    st.write("### 🔍 DEBUG: Feature Extraction Comparison")
+
+    current_row = processed_df[processed_df['cycle'] == selected_cycle]
+
+    if len(current_row) == 0:
+        st.error("No data found for this cycle")
+        return
+
+    feature_names = artifacts[selected_dataset]['feature_names']
+    expected_features = feature_names['all_features']
+
+    st.write(f"**Dataset:** {selected_dataset}")
+    st.write(f"**Engine:** {current_row['engine_id'].values[0]}")
+    st.write(f"**Cycle:** {selected_cycle}")
+    st.write(f"**Total expected features:** {len(expected_features)}")
+
+    # بررسی ویژگی‌های موجود
+    existing_features = []
+    missing_features = []
+
+    for col in expected_features:
+        if col in current_row.columns:
+            existing_features.append(col)
+        else:
+            missing_features.append(col)
+
+    st.write(f"**Existing features:** {len(existing_features)}")
+    st.write(f"**Missing features:** {len(missing_features)}")
+
+    if len(missing_features) > 0:
+        st.warning(f"⚠️ Missing {len(missing_features)} features!")
+        st.write(f"First 10 missing: {missing_features[:10]}")
+
+    # نمایش 10 ویژگی اول با مقادیر
+    st.write("### First 10 features with values:")
+    debug_data = []
+    for i, col in enumerate(expected_features[:10]):
+        if col in current_row.columns:
+            val = current_row[col].values[0]
+            debug_data.append({'Index': i, 'Feature': col, 'Value': val, 'Status': '✅'})
+        else:
+            debug_data.append({'Index': i, 'Feature': col, 'Value': 'MISSING', 'Status': '❌'})
+
+    st.dataframe(pd.DataFrame(debug_data), hide_index=True, use_container_width=True)
+
+    # مقایسه با مقادیر نوت‌بوک (اگر کاربر وارد کند)
+    st.write("### Compare with Notebook values")
+    notebook_values = st.text_area(
+        "Paste notebook feature values (comma separated)",
+        placeholder="e.g., 1.2, 3.4, 5.6, ..."
+    )
+
+    if notebook_values:
+        try:
+            nb_values = [float(x.strip()) for x in notebook_values.split(',')]
+            st.write(f"**Notebook values count:** {len(nb_values)}")
+
+            # مقایسه
+            comparison = []
+            for i in range(min(10, len(nb_values), len(expected_features))):
+                if expected_features[i] in current_row.columns:
+                    app_val = current_row[expected_features[i]].values[0]
+                    diff = app_val - nb_values[i]
+                    comparison.append({
+                        'Index': i,
+                        'Feature': expected_features[i],
+                        'Notebook': nb_values[i],
+                        'App': app_val,
+                        'Difference': diff,
+                        'Match': '✅' if abs(diff) < 0.001 else '❌'
+                    })
+
+            st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+
+            if all(abs(c['Difference']) < 0.001 for c in comparison):
+                st.success("✅ Features match with notebook!")
+            else:
+                st.error("❌ Features DO NOT match with notebook!")
+        except Exception as e:
+            st.error(f"Error parsing notebook values: {e}")
+
+    return existing_features, missing_features
+
 
 def main():
     initialize_session_state()
@@ -1440,6 +1526,10 @@ def main():
                 st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
                 if selected_dataset == 'FD002':
                     st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
+
+    # بعد از پردازش داده‌ها و قبل از predict_button
+    if st.checkbox("🔍 Debug Features", value=False):
+        debug_features(processed_df, selected_cycle, selected_dataset, artifacts)
 
 
 if __name__ == "__main__":
