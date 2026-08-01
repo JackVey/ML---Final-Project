@@ -1284,6 +1284,22 @@ def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
         st.error("Not found!")
         return
 
+    # ==========================================
+    # بررسی scaler_dict مستقیماً از آرتیفکت
+    # ==========================================
+    st.write("### 🔍 Checking scaler_dict from artifact")
+
+    scaler_dict = artifacts[dataset]['scaler_dict']
+    st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
+
+    if 2 in scaler_dict:
+        # بررسی mean و scale برای سنسورهای اول
+        scaler = scaler_dict[2]
+        st.write(f"**Scaler for Regime 2:**")
+        st.write(f"  - mean (first 10): {scaler.mean_[:10] if hasattr(scaler, 'mean_') else 'N/A'}")
+        st.write(f"  - scale (first 10): {scaler.scale_[:10] if hasattr(scaler, 'scale_') else 'N/A'}")
+    # ==========================================
+
     test_df, rul_df = load_raw_data(dataset)
     raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
 
