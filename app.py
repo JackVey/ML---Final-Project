@@ -1306,6 +1306,14 @@ def initialize_session_state():
 
 
 def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
+    # ==========================================
+    # 🔍 بررسی window_info
+    # ==========================================
+    st.write("### 🔍 Window Info Check")
+    window_info = artifacts[dataset]['window_info']
+    st.write(f"Window sizes: {window_info['window_sizes']}")
+    st.write(f"Feature cols: {len(window_info['feature_cols'])}")
+    st.write(f"Op settings: {window_info['op_settings']}")
     """مقایسه مستقیم ویژگی‌های یک موتور خاص با نوت‌بوک"""
 
     st.write(f"### 🔍 Debug: Engine {engine_id}, Cycle {cycle}")
