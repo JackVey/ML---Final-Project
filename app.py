@@ -1272,6 +1272,77 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
 
     return features
 
+
+def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
+    """بررسی scaling در app"""
+
+    st.write("### 🔍 Debug: Scaling Check")
+
+    current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
+
+    if len(current_row) == 0:
+        st.error("Not found!")
+        return
+
+    # بارگذاری داده‌های خام برای مقایسه
+    test_df, rul_df = load_raw_data(dataset)
+    raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+
+    if len(raw_row) == 0:
+        st.error("Raw data not found!")
+        return
+
+    st.write("### Raw Sensor Values (before scaling):")
+    sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
+    raw_data = {}
+    for col in sensor_cols:
+        if col in raw_row.columns:
+            raw_data[col] = raw_row[col].values[0]
+    st.dataframe(pd.DataFrame([raw_data]).T, columns=['Raw Value'])
+
+    st.write("### Scaled Sensor Values (after scaling):")
+    scaled_data = {}
+    for col in sensor_cols:
+        if col in current_row.columns:
+            scaled_data[col] = current_row[col].values[0]
+    st.dataframe(pd.DataFrame([scaled_data]).T, columns=['Scaled Value'])
+
+    # بررسی regime
+    if 'regime' in current_row.columns:
+        st.write(f"**Regime:** {current_row['regime'].values[0]}")
+
+    # بررسی scaler_dict
+    scaler_dict = artifacts[dataset]['scaler_dict']
+    st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
+
+    # مقایسه با مقادیر نوت‌بوک (از خروجی قبلی)
+    notebook_values = {
+        'sensor_1': 0.0,
+        'sensor_2': -0.02085,
+        'sensor_3': 0.125843,
+        'sensor_4': -0.101434,
+        'sensor_5': 0.0,
+        'sensor_6': -0.17469,
+        'sensor_7': 1.840167,
+    }
+
+    st.write("### Comparison with Notebook:")
+    comparison = []
+    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
+        if col in current_row.columns and col in notebook_values:
+            app_val = current_row[col].values[0]
+            nb_val = notebook_values[col]
+            comparison.append({
+                'Sensor': col,
+                'Notebook': nb_val,
+                'App': app_val,
+                'Diff': abs(app_val - nb_val),
+                'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
+            })
+
+    st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+
+
 def main():
     initialize_session_state()
 
@@ -1528,6 +1599,22 @@ def main():
         debug_cycle = st.number_input("Debug Cycle", value=150, step=1)
         if st.button("Run Debug Comparison"):
             debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+
+    # در بخش main، بعد از processed_df و قبل از predict_button
+
+    with st.expander("🔧 Debug Tools"):
+        st.write("Use these tools to debug feature extraction and scaling")
+
+        debug_engine = st.number_input("Debug Engine ID", value=68, step=1, key="debug_engine")
+        debug_cycle = st.number_input("Debug Cycle", value=150, step=1, key="debug_cycle")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Run Scaling Debug", key="debug_scaling_btn"):
+                debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+        with col2:
+            if st.button("Run Feature Comparison", key="debug_features_btn"):
+                debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
 
 
 if __name__ == "__main__":
