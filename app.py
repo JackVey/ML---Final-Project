@@ -870,7 +870,6 @@ def predict_rul(features, dataset, artifacts):
 def predict_failure_risk(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     calibrated_models = ds_artifacts['calibrated_models']
-    tuned_thresholds = ds_artifacts['tuned_thresholds']
     horizons = [10, 20, 30]
 
     feature_names = ds_artifacts['feature_names']
@@ -889,22 +888,10 @@ def predict_failure_risk(features, dataset, artifacts):
         model = calibrated_models[h]['XGBoost']
         prob = model.predict_proba(features.reshape(1, -1))[0, 1]
 
-        if str(h) in tuned_thresholds:
-            threshold = tuned_thresholds[str(h)]['XGBoost']
-        elif h in tuned_thresholds:
-            threshold = tuned_thresholds[h]['XGBoost']
-        else:
-            for key in tuned_thresholds.keys():
-                if str(h) in str(key):
-                    threshold = tuned_thresholds[key]['XGBoost']
-                    break
-            else:
-                threshold = 0.5
-
         risks[f'h{h}'] = {
             'probability': prob,
-            'threshold': threshold,
-            'alert': prob >= threshold
+            'threshold': 0.05,
+            'alert': prob >= 0.05
         }
     return risks
 
@@ -968,11 +955,8 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
         'rul_inspect_lower': 90,
         'prob_inspect': 0.08,
         'anomaly_inspect': 78,
-        'trend_threshold': -4,
         'monitor_prob': 0.05,
     }
-
-    rul_trend = 0
 
     if (rul_pred <= final_thresholds['rul_stop']) or \
             (rul_lower <= 30) or \
@@ -1036,6 +1020,7 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
             'triggers': ['All parameters within normal range'],
             'confidence': 'HIGH'
         }
+
 
 def get_dataset_description(dataset):
     descriptions = {
