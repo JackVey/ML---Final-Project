@@ -866,7 +866,6 @@ def predict_rul(features, dataset, artifacts):
 
     return pred_capped, lower, upper
 
-
 def predict_failure_risk(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     calibrated_models = ds_artifacts['calibrated_models']
@@ -884,23 +883,42 @@ def predict_failure_risk(features, dataset, artifacts):
         else:
             features = features[:len(expected_features)]
 
+    # ========== DEBUG: predict_failure_risk ==========
+    st.write("### DEBUG: predict_failure_risk")
+    st.write(f"Dataset: {dataset}")
+    st.write(f"tuned_thresholds type: {type(tuned_thresholds)}")
+    if tuned_thresholds is not None:
+        st.write(f"tuned_thresholds keys: {list(tuned_thresholds.keys())}")
+        for key in list(tuned_thresholds.keys())[:5]:
+            st.write(f"  {key}: {tuned_thresholds[key]}")
+    else:
+        st.write("tuned_thresholds is None")
+    st.write("---")
+
     risks = {}
     for h in horizons:
         model = calibrated_models[h]['XGBoost']
         prob = model.predict_proba(features.reshape(1, -1))[0, 1]
 
+        st.write(f"Horizon {h}: prob = {prob:.4f}")
+
         if str(h) in tuned_thresholds:
             threshold = tuned_thresholds[str(h)]['XGBoost']
+            st.write(f"  Found in str({h}): {threshold}")
         elif h in tuned_thresholds:
             threshold = tuned_thresholds[h]['XGBoost']
+            st.write(f"  Found in {h}: {threshold}")
         else:
-            threshold = 0.1
+            threshold = 0.05
+            st.write(f"  NOT found, using default: {threshold}")
 
         risks[f'h{h}'] = {
             'probability': prob,
             'threshold': threshold,
             'alert': prob >= threshold
         }
+
+    st.write("---")
     return risks
 
 
@@ -920,35 +938,66 @@ def predict_anomaly(features, dataset, artifacts):
         else:
             features = features[:len(expected_features)]
 
+    # ========== DEBUG: predict_anomaly ==========
+    st.write("### DEBUG: predict_anomaly")
+    st.write(f"Dataset: {dataset}")
+    st.write(f"anomaly_models keys: {list(anomaly_models.keys())}")
+    st.write(f"pct_scores_test type: {type(pct_scores_test)}")
+    if pct_scores_test is not None:
+        st.write(f"pct_scores_test keys: {list(pct_scores_test.keys())}")
+        for key in pct_scores_test.keys():
+            if pct_scores_test[key] is not None:
+                st.write(f"  {key}: length={len(pct_scores_test[key])}, min={np.min(pct_scores_test[key]):.3f}, max={np.max(pct_scores_test[key]):.3f}")
+            else:
+                st.write(f"  {key}: None")
+    else:
+        st.write("pct_scores_test is None")
+    st.write("---")
+
     scores = {}
     for name, model in anomaly_models.items():
-        if name == 'PCA':
-            reconstructed = model.inverse_transform(model.transform(features.reshape(1, -1)))
-            raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
-        else:
-            raw_score = -model.decision_function(features.reshape(1, -1))[0]
-
-        if name in pct_scores_test:
-            ref_scores = pct_scores_test[name]
-            if len(ref_scores) > 0:
-                if raw_score >= np.max(ref_scores):
-                    percentile = 100.0
-                elif raw_score <= np.min(ref_scores):
-                    percentile = 0.0
-                else:
-                    percentile = float(np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores))))
+        try:
+            if name == 'PCA':
+                transformed = model.transform(features.reshape(1, -1))
+                reconstructed = model.inverse_transform(transformed)
+                raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
             else:
-                percentile = 0.0
-        else:
-            percentile = 0.0
+                raw_score = -model.decision_function(features.reshape(1, -1))[0]
 
-        scores[name] = {
-            'raw_score': float(raw_score),
-            'percentile': float(percentile),
-            'alert': percentile >= 95
-        }
+            st.write(f"Model {name}: raw_score = {raw_score:.4f}")
+
+            if pct_scores_test is not None and name in pct_scores_test:
+                ref_scores = pct_scores_test[name]
+                if ref_scores is not None and len(ref_scores) > 0:
+                    if raw_score >= np.max(ref_scores):
+                        percentile = 100.0
+                    elif raw_score <= np.min(ref_scores):
+                        percentile = 0.0
+                    else:
+                        percentile = float(np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores))))
+                    st.write(f"  percentile = {percentile:.2f} (from {len(ref_scores)} ref_scores)")
+                else:
+                    percentile = 50.0
+                    st.write(f"  ref_scores is empty, using default: {percentile}")
+            else:
+                percentile = 50.0
+                st.write(f"  pct_scores_test[{name}] not found, using default: {percentile}")
+
+            scores[name] = {
+                'raw_score': float(raw_score),
+                'percentile': float(percentile),
+                'alert': percentile >= 95
+            }
+        except Exception as e:
+            st.write(f"  ERROR in {name}: {str(e)}")
+            scores[name] = {
+                'raw_score': 0.0,
+                'percentile': 50.0,
+                'alert': False
+            }
+
+    st.write("---")
     return scores
-
 
 def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
     prob_h30 = failure_risks['h30']['probability']
