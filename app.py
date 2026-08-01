@@ -732,10 +732,25 @@ def load_raw_data(dataset):
 
 @st.cache_data
 def load_preprocessed_fd002():
-    """بارگذاری داده‌های از پیش پردازش‌شده FD002 از فایل‌های .txt"""
-    df = pd.read_csv('data/test_window_fd002_preprocessed.txt', sep=r'\s+')
-    rul_df = pd.read_csv('data/rul_final_fd002.txt', sep=r'\s+')
-    return df, rul_df
+    """بارگذاری داده‌های از پیش پردازش‌شده FD002 از فایل‌های .csv.gz فشرده"""
+    try:
+        df = pd.read_csv('data/test_window_fd002_preprocessed.csv.gz', compression='gzip')
+        rul_df = pd.read_csv('data/rul_final_fd002.csv.gz', compression='gzip')
+
+        # دیباگ: بررسی اینکه ستون‌ها درست هستند
+        st.write("### 🔍 Debug: Loaded FD002 data")
+        st.write(f"Columns: {df.columns.tolist()[:10]}")
+        st.write(f"engine_id in columns: {'engine_id' in df.columns}")
+        st.write(f"Shape: {df.shape}")
+
+        return df, rul_df
+    except FileNotFoundError as e:
+        st.error(f"File not found: {e}")
+        st.info("Please make sure the preprocessed data files are in the 'data' folder.")
+        return None, None
+    except Exception as e:
+        st.error(f"Error loading preprocessed data: {e}")
+        return None, None
 
 
 def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
