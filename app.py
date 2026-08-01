@@ -1395,6 +1395,20 @@ def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
     raw_df = pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value'])
     st.dataframe(raw_df, hide_index=True, use_container_width=True)
 
+    st.write("#### Step 2.5: sensor_cols comparison")
+    sensor_cols_app = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
+    sensor_cols_notebook = [f'sensor_{i}' for i in range(1, 22)]
+
+    st.write(f"sensor_cols_app: {sensor_cols_app}")
+    st.write(f"sensor_cols_notebook: {sensor_cols_notebook}")
+
+    if sensor_cols_app == sensor_cols_notebook:
+        st.write("✅ sensor_cols match!")
+    else:
+        st.write("❌ sensor_cols differ!")
+        st.write(f"Missing in app: {set(sensor_cols_notebook) - set(sensor_cols_app)}")
+        st.write(f"Extra in app: {set(sensor_cols_app) - set(sensor_cols_notebook)}")
+
     st.write("#### Step 2: Scaler Dict Check")
     scaler_dict = artifacts[dataset]['scaler_dict']
     st.write(f"Available scalers: {list(scaler_dict.keys())}")
