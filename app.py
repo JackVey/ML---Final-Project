@@ -783,6 +783,7 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 
     return df_out
 
+
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
 
@@ -820,20 +821,19 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         op_settings = feature_info['op_settings']
         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
 
-        sensor_cols_scaled = feature_info['active_sensors']
         scaler_dict = ds_artifacts['scaler_dict']
         kmeans = ds_artifacts['kmeans']
 
         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
 
-        for col in sensor_cols_scaled:
+        for col in sensor_cols:
             engine_df[col] = engine_df[col].astype(float)
 
         for r in range(6):
             regime_mask = engine_df['regime'] == r
             if regime_mask.sum() > 0 and r in scaler_dict:
-                engine_df.loc[regime_mask, sensor_cols_scaled] = scaler_dict[r].transform(
-                    engine_df.loc[regime_mask, sensor_cols_scaled])
+                engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+                    engine_df.loc[regime_mask, sensor_cols])
 
     window_info = ds_artifacts['window_info']
     feature_cols = window_info['feature_cols']
