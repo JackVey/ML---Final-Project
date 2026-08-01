@@ -894,7 +894,7 @@ def predict_failure_risk(features, dataset, artifacts):
         elif h in tuned_thresholds:
             threshold = tuned_thresholds[h]['XGBoost']
         else:
-            threshold = 0.01
+            threshold = 0.1
 
         risks[f'h{h}'] = {
             'probability': prob,
