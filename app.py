@@ -1009,6 +1009,58 @@ def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, 
 #
 #     return pred_capped, lower, upper
 
+# def predict_rul(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     model = ds_artifacts['xgb_model']
+#     conformal_params = ds_artifacts['conformal_params']
+#
+#     feature_names = ds_artifacts['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     # ========== DEBUG ==========
+#     st.write("### DEBUG: predict_rul")
+#     st.write(f"Dataset: {dataset}")
+#     st.write(f"Features length: {len(features)}")
+#     st.write(f"Expected features length: {len(expected_features)}")
+#
+#     if len(features) != len(expected_features):
+#         st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
+#         if len(features) < len(expected_features):
+#             padded = np.zeros(len(expected_features))
+#             padded[:len(features)] = features
+#             features = padded
+#             st.write(f"  Padded to {len(features)}")
+#         else:
+#             features = features[:len(expected_features)]
+#             st.write(f"  Truncated to {len(expected_features)}")
+#
+#     # نمایش چند ویژگی اول برای بررسی
+#     st.write(f"First 5 features: {features[:5]}")
+#     st.write(f"Feature names (first 5): {expected_features[:5]}")
+#     # ===========================
+#
+#     pred = model.predict(features.reshape(1, -1))[0]
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     pred_capped = np.clip(pred, None, rul_cap)
+#
+#     st.write(f"Raw prediction: {pred:.2f}")
+#     st.write(f"Capped prediction: {pred_capped:.2f}")
+#
+#     if pred_capped <= 50:
+#         q = conformal_params['q_95_near_failure']
+#     elif pred_capped <= 100:
+#         q = conformal_params['q_95_mid_life']
+#     else:
+#         q = conformal_params['q_95_early_life']
+#
+#     lower = max(0, pred_capped - q)
+#     upper = pred_capped + q
+#
+#     st.write(f"q_95: {q:.2f}")
+#     st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
+#
+#     return pred_capped, lower, upper
+
 def predict_rul(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     model = ds_artifacts['xgb_model']
@@ -1017,47 +1069,62 @@ def predict_rul(features, dataset, artifacts):
     feature_names = ds_artifacts['feature_names']
     expected_features = feature_names['all_features']
 
-    # ========== DEBUG ==========
-    st.write("### DEBUG: predict_rul")
-    st.write(f"Dataset: {dataset}")
-    st.write(f"Features length: {len(features)}")
-    st.write(f"Expected features length: {len(expected_features)}")
+    # ============================================================
+    # 📋 DEBUG: Prediction Pipeline (Step-by-Step)
+    # ============================================================
+    st.write("=" * 60)
+    st.write("🔍 PREDICTION PIPELINE DEBUG (APP)")
+    st.write("=" * 60)
+
+    st.write(f"📌 Dataset          : {dataset}")
+    st.write(f"📌 Features length  : {len(features)}")
+    st.write(f"📌 Expected features: {len(expected_features)}")
 
     if len(features) != len(expected_features):
-        st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
+        st.write(f"⚠️ Feature mismatch! Adjusting...")
         if len(features) < len(expected_features):
-            padded = np.zeros(len(expected_features))
-            padded[:len(features)] = features
-            features = padded
-            st.write(f"  Padded to {len(features)}")
+            features = np.pad(features, (0, len(expected_features) - len(features)))
+            st.write(f"   → Padded to {len(features)}")
         else:
             features = features[:len(expected_features)]
-            st.write(f"  Truncated to {len(expected_features)}")
+            st.write(f"   → Truncated to {len(expected_features)}")
 
-    # نمایش چند ویژگی اول برای بررسی
-    st.write(f"First 5 features: {features[:5]}")
-    st.write(f"Feature names (first 5): {expected_features[:5]}")
-    # ===========================
+    st.write("\n--- First 10 Features (App) ---")
+    for i in range(10):
+        st.write(f"  {i:2d}. {expected_features[i]:<20} = {features[i]:.6f}")
 
+    # ============================================================
+    # 🧠 Model Prediction
+    # ============================================================
+    st.write("\n🧠 Running XGBoost model...")
     pred = model.predict(features.reshape(1, -1))[0]
     rul_cap = ds_artifacts['rul_params']['rul_cap']
     pred_capped = np.clip(pred, None, rul_cap)
 
-    st.write(f"Raw prediction: {pred:.2f}")
-    st.write(f"Capped prediction: {pred_capped:.2f}")
+    st.write(f"  Raw prediction   : {pred:.2f}")
+    st.write(f"  Capped prediction: {pred_capped:.2f} (cap={rul_cap})")
 
+    # ============================================================
+    # 📐 Conformal Prediction (Uncertainty)
+    # ============================================================
+    st.write("\n📐 Conformal Prediction (q_95):")
     if pred_capped <= 50:
         q = conformal_params['q_95_near_failure']
+        region = "Near-failure (RUL≤50)"
     elif pred_capped <= 100:
         q = conformal_params['q_95_mid_life']
+        region = "Mid-life (50<RUL≤100)"
     else:
         q = conformal_params['q_95_early_life']
+        region = "Early-life (RUL>100)"
 
     lower = max(0, pred_capped - q)
     upper = pred_capped + q
 
-    st.write(f"q_95: {q:.2f}")
-    st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
+    st.write(f"  Region        : {region}")
+    st.write(f"  q_95          : {q:.2f}")
+    st.write(f"  Confidence Int: [{lower:.2f}, {upper:.2f}]")
+    st.write("=" * 60)
 
     return pred_capped, lower, upper
 
