@@ -1284,7 +1284,6 @@ def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
         st.error("Not found!")
         return
 
-    # بارگذاری داده‌های خام برای مقایسه
     test_df, rul_df = load_raw_data(dataset)
     raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
 
@@ -1298,24 +1297,25 @@ def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
     for col in sensor_cols:
         if col in raw_row.columns:
             raw_data[col] = raw_row[col].values[0]
-    st.dataframe(pd.DataFrame([raw_data]).T, columns=['Raw Value'])
+
+    raw_df = pd.DataFrame(list(raw_data.items()), columns=['Sensor', 'Raw Value'])
+    st.dataframe(raw_df, hide_index=True, use_container_width=True)
 
     st.write("### Scaled Sensor Values (after scaling):")
     scaled_data = {}
     for col in sensor_cols:
         if col in current_row.columns:
             scaled_data[col] = current_row[col].values[0]
-    st.dataframe(pd.DataFrame([scaled_data]).T, columns=['Scaled Value'])
 
-    # بررسی regime
+    scaled_df = pd.DataFrame(list(scaled_data.items()), columns=['Sensor', 'Scaled Value'])
+    st.dataframe(scaled_df, hide_index=True, use_container_width=True)
+
     if 'regime' in current_row.columns:
         st.write(f"**Regime:** {current_row['regime'].values[0]}")
 
-    # بررسی scaler_dict
     scaler_dict = artifacts[dataset]['scaler_dict']
     st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
 
-    # مقایسه با مقادیر نوت‌بوک (از خروجی قبلی)
     notebook_values = {
         'sensor_1': 0.0,
         'sensor_2': -0.02085,
@@ -1341,7 +1341,6 @@ def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
             })
 
     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
-
 
 def main():
     initialize_session_state()
