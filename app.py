@@ -875,6 +875,83 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 #             engine_df[col + '_raw'] = engine_df_raw[col]
 #
 #     return engine_df
+# def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+#     # ==========================================
+#     # DEBUG: VERSION CHECK
+#     # ==========================================
+#     st.write("### 🔍 DEBUG: preprocess_engine_data version")
+#     st.write("Version: 2.0 - WITH natural sorting (key=lambda x: int(x.split('_')[1]))")
+#     # ==========================================
+#     ds_artifacts = artifacts[dataset]
+#
+#     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+#
+#     if len(engine_df) == 0:
+#         return pd.DataFrame()
+#
+#     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+#     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+#
+#     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+#     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+#     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
+#
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
+#
+#     engine_df_raw = engine_df.copy()
+#
+#     feature_info = ds_artifacts['feature_info']
+#     features_to_scale = feature_info['all_features']
+#     scaler = ds_artifacts['scaler']
+#
+#     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
+#     if dropped_sensors:
+#         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+#         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
+#
+#     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
+#     # ==========================================
+#     # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
+#     # ==========================================
+#     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
+#     st.write("### 🔍 DEBUG: sensor_cols after natural sort")
+#     st.write(f"sensor_cols: {sensor_cols[:10]}...")
+#     # ==========================================
+#
+#     if dataset == 'FD001':
+#         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
+#     else:
+#         op_settings = feature_info['op_settings']
+#         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
+#
+#         scaler_dict = ds_artifacts['scaler_dict']
+#         kmeans = ds_artifacts['kmeans']
+#
+#         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
+#
+#         for col in sensor_cols:
+#             engine_df[col] = engine_df[col].astype(float)
+#
+#         for r in range(6):
+#             regime_mask = engine_df['regime'] == r
+#             if regime_mask.sum() > 0 and r in scaler_dict:
+#                 try:
+#                     engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+#                         engine_df.loc[regime_mask, sensor_cols])
+#                 except Exception as e:
+#                     pass
+#
+#     window_info = ds_artifacts['window_info']
+#     feature_cols = window_info['feature_cols']
+#     active_cols = [col for col in feature_cols if col in engine_df.columns]
+#     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
+#
+#     for col in sensor_cols:
+#         if col in engine_df_raw.columns:
+#             engine_df[col + '_raw'] = engine_df_raw[col]
+#
+#     return engine_df
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     # ==========================================
@@ -911,12 +988,13 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
-    sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
     # ==========================================
-    # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
+    # ✅ استفاده از active_sensors به جای همه سنسورها
     # ==========================================
+    active_sensors = feature_info['active_sensors']
+    sensor_cols = [col for col in active_sensors if col in engine_df.columns]
     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
-    st.write("### 🔍 DEBUG: sensor_cols after natural sort")
+    st.write("### 🔍 DEBUG: sensor_cols after natural sort (active sensors only)")
     st.write(f"sensor_cols: {sensor_cols[:10]}...")
     # ==========================================
 
