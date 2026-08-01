@@ -1505,7 +1505,7 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
     features_array = np.array(features).reshape(1, -1)
     pred = model.predict(features_array)[0]
     st.write(f"**App RUL Prediction:** {pred:.2f}")
-    
+
     # ==========================================
     # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
     # ==========================================
@@ -1517,16 +1517,45 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
                                                               '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
     st.write(f"Total window features: {len(window_cols)}")
 
-    st.write("First 10 window features (with values):")
-    window_data = []
-    for i, col in enumerate(window_cols[:10]):
-        val = current_row[col].values[0]
-        window_data.append({
-            'Index': i,
-            'Feature': col,
-            'Value': val
-        })
-    st.dataframe(pd.DataFrame(window_data), hide_index=True, use_container_width=True)
+    # ==========================================
+    # 🔍 بررسی خروجی get_features_for_prediction
+    # ==========================================
+    st.write("### 🔍 Testing get_features_for_prediction")
+
+    features = get_features_for_prediction(processed_df, cycle, dataset, artifacts)
+    st.write(f"Features length: {len(features)}")
+    st.write(f"First 10 features: {features[:10]}")
+
+    # مقایسه با مقادیر نوت‌بوک
+    notebook_first_10 = [
+        0.747954,  # op_setting_1
+        0.865002,  # op_setting_2
+        0.417670,  # op_setting_3
+        0.000000,  # sensor_1
+        -0.020850,  # sensor_2
+        0.125843,  # sensor_3
+        -0.101434,  # sensor_4
+        -0.000000,  # sensor_5
+        -0.174690,  # sensor_6
+        1.840167  # sensor_7
+    ]
+
+    st.write("### Comparison with Notebook (first 10):")
+    comparison = []
+    for i in range(10):
+        app_val = features[i] if i < len(features) else None
+        nb_val = notebook_first_10[i]
+        if app_val is not None:
+            diff = abs(app_val - nb_val)
+            comparison.append({
+                'Position': i,
+                'Notebook': nb_val,
+                'App': app_val,
+                'Diff': diff,
+                'Match': '✅' if diff < 0.001 else '❌'
+            })
+
+    st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
 
     # ==========================================
     # 🔍 بررسی تعداد کل ویژگی‌ها
