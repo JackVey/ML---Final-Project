@@ -674,41 +674,40 @@ def main():
 
         dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
 
-        if selected_dataset == 'FD002':
-            sensor_cols = [col for col in processed_df.columns if col.endswith('_raw') and 'sensor_' in col]
-            if not sensor_cols:
-                sensor_cols = [col for col in processed_df.columns if col.startswith('sensor_')][:10]
-                sensor_cols = [c + '_raw' for c in sensor_cols]
-        else:
-            sensor_cols = [col for col in processed_df.columns if col.endswith('_raw') and 'sensor_' in col]
-            sensor_cols = [col for col in sensor_cols if col.replace('_raw', '') not in dropped_sensors]
+        raw_test_df, _ = load_raw_data(selected_dataset)
+        raw_engine_data = raw_test_df[raw_test_df['engine_id'] == st.session_state.selected_engine]
+
+        sensor_cols = [col for col in raw_engine_data.columns if col.startswith('sensor_')]
+        sensor_cols = [col for col in sensor_cols if col not in dropped_sensors]
 
         col1, col2 = st.columns([2, 1])
         with col1:
             selected_sensor = st.selectbox(
                 "Select Sensor to Visualize",
-                sensor_cols if sensor_cols else ['sensor_2_raw'],
-                format_func=lambda x: x.replace('_raw', '')
+                sensor_cols if sensor_cols else ['sensor_2'],
+                format_func=lambda x: x
             )
         with col2:
             show_health = st.checkbox("Show Health Features", value=False)
+
+        rul_data = processed_df[processed_df['engine_id'] == st.session_state.selected_engine]
 
         if show_health:
             fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
                                 vertical_spacing=0.15)
 
-            engine_data = processed_df[processed_df['engine_id'] == st.session_state.selected_engine]
             fig.add_trace(
-                go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='True RUL',
+                go.Scatter(x=raw_engine_data['cycle'], y=rul_data['RUL'], mode='lines', name='True RUL',
                            line=dict(color='green', width=2)),
                 row=1, col=1
             )
             fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
 
             anomaly_col = 'OCSVM_Anomaly_Score'
-            if anomaly_col in engine_data.columns:
+            if anomaly_col in processed_df.columns:
+                anomaly_data = processed_df[processed_df['engine_id'] == st.session_state.selected_engine]
                 fig.add_trace(
-                    go.Scatter(x=engine_data['cycle'], y=engine_data[anomaly_col], mode='lines',
+                    go.Scatter(x=anomaly_data['cycle'], y=anomaly_data[anomaly_col], mode='lines',
                                name='Anomaly Score',
                                line=dict(color='orange', width=2)),
                     row=2, col=1
@@ -721,20 +720,19 @@ def main():
         else:
             fig = go.Figure()
 
-            engine_data = processed_df[processed_df['engine_id'] == st.session_state.selected_engine]
             fig.add_trace(
-                go.Scatter(x=engine_data['cycle'], y=engine_data[selected_sensor], mode='lines',
-                           name=selected_sensor.replace('_raw', ''),
+                go.Scatter(x=raw_engine_data['cycle'], y=raw_engine_data[selected_sensor], mode='lines',
+                           name=selected_sensor,
                            line=dict(color='blue', width=2))
             )
 
             fig.add_trace(
-                go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='RUL',
+                go.Scatter(x=rul_data['cycle'], y=rul_data['RUL'], mode='lines', name='RUL',
                            line=dict(color='green', width=2, dash='dot'), yaxis='y2')
             )
 
             fig.update_layout(
-                yaxis=dict(title=selected_sensor.replace('_raw', '')),
+                yaxis=dict(title=selected_sensor),
                 yaxis2=dict(title='RUL', overlaying='y', side='right'),
                 height=400,
                 showlegend=True
