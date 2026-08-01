@@ -717,14 +717,6 @@ def load_raw_data(dataset):
     return test_df, rul_df
 
 
-@st.cache_data
-def load_raw_train_data(dataset):
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
-                                                                                     range(1, 22)]
-    train_df = pd.read_csv(f'data/train_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
-    return train_df
-
-
 def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
     window_sizes = window_info['window_sizes']
     df_out = engine_df.copy()
@@ -755,7 +747,7 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
     return df_out
 
 
-def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts, train_df=None):
+def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
 
     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
@@ -819,14 +811,43 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts, train
     return engine_df
 
 
+def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
+    current_row = processed_df[processed_df['cycle'] == selected_cycle]
+
+    if len(current_row) == 0:
+        return None
+
+    feature_names = artifacts[selected_dataset]['feature_names']
+    expected_features = feature_names['all_features']
+
+    features = []
+
+    for col in expected_features:
+        if col in current_row.columns:
+            val = current_row[col].values[0]
+            if pd.isna(val):
+                val = 0.0
+            features.append(float(val))
+        else:
+            features.append(0.0)
+
+    return np.array(features)
+
+
 def predict_rul(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     model = ds_artifacts['xgb_model']
     conformal_params = ds_artifacts['conformal_params']
 
-    if ds_artifacts['feature_names'] is not None:
-        expected_features = ds_artifacts['feature_names']['all_features']
-        if len(features) != len(expected_features):
+    feature_names = ds_artifacts['feature_names']
+    expected_features = feature_names['all_features']
+
+    if len(features) != len(expected_features):
+        if len(features) < len(expected_features):
+            padded = np.zeros(len(expected_features))
+            padded[:len(features)] = features
+            features = padded
+        else:
             features = features[:len(expected_features)]
 
     pred = model.predict(features.reshape(1, -1))[0]
@@ -852,9 +873,15 @@ def predict_failure_risk(features, dataset, artifacts):
     tuned_thresholds = ds_artifacts['tuned_thresholds']
     horizons = [10, 20, 30]
 
-    if ds_artifacts['feature_names'] is not None:
-        expected_features = ds_artifacts['feature_names']['all_features']
-        if len(features) != len(expected_features):
+    feature_names = ds_artifacts['feature_names']
+    expected_features = feature_names['all_features']
+
+    if len(features) != len(expected_features):
+        if len(features) < len(expected_features):
+            padded = np.zeros(len(expected_features))
+            padded[:len(features)] = features
+            features = padded
+        else:
             features = features[:len(expected_features)]
 
     risks = {}
@@ -875,9 +902,15 @@ def predict_anomaly(features, dataset, artifacts):
     anomaly_models = ds_artifacts['anomaly_models']
     pct_scores_test = ds_artifacts['pct_scores_test']
 
-    if ds_artifacts['feature_names'] is not None:
-        expected_features = ds_artifacts['feature_names']['all_features']
-        if len(features) != len(expected_features):
+    feature_names = ds_artifacts['feature_names']
+    expected_features = feature_names['all_features']
+
+    if len(features) != len(expected_features):
+        if len(features) < len(expected_features):
+            padded = np.zeros(len(expected_features))
+            padded[:len(features)] = features
+            features = padded
+        else:
             features = features[:len(expected_features)]
 
     scores = {}
@@ -1004,7 +1037,6 @@ def main():
 
         with st.spinner(f"Loading {selected_dataset} data..."):
             test_df, rul_df = load_raw_data(selected_dataset)
-            train_df = load_raw_train_data(selected_dataset)
 
         engines = sorted(test_df['engine_id'].unique())
         selected_engine = st.selectbox(
@@ -1015,7 +1047,7 @@ def main():
 
         with st.spinner(f"Processing engine {selected_engine} data..."):
             processed_df = preprocess_engine_data(
-                selected_dataset, selected_engine, test_df, rul_df, artifacts, train_df
+                selected_dataset, selected_engine, test_df, rul_df, artifacts
             )
 
         if len(processed_df) == 0:
@@ -1037,51 +1069,34 @@ def main():
         if predict_button:
             st.session_state.prediction_done = True
 
-        current_row = processed_df[processed_df['cycle'] == selected_cycle]
-        if len(current_row) == 0:
-            st.error("Invalid selection! Please choose a valid cycle.")
-            return
-
-        if artifacts[selected_dataset]['feature_names'] is not None:
-            expected_cols = artifacts[selected_dataset]['feature_names']['all_features']
-            available_expected = [col for col in expected_cols if col in processed_df.columns]
-            feature_cols = [col for col in available_expected if col in processed_df.columns]
-        else:
-            feature_cols = [col for col in processed_df.columns
-                            if col not in ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final']]
-            if 'regime' in processed_df.columns:
-                feature_cols = [col for col in feature_cols if col != 'regime']
-
-        features = current_row[feature_cols].values.flatten()
-
-        if features.dtype == 'object':
-            try:
-                features = features.astype(float)
-            except:
-                features = np.array([float(x) if isinstance(x, (int, float)) else 0.0 for x in features])
-
-        if predict_button:
-            with st.spinner("Making predictions..."):
-                rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
-                risks = predict_failure_risk(features, selected_dataset, artifacts)
-                anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
-                recommendation = make_recommendation(
-                    rul_pred, rul_lower, rul_upper,
-                    risks, anomaly_scores, selected_dataset, artifacts
-                )
-
-                st.session_state.rul_pred = rul_pred
-                st.session_state.rul_lower = rul_lower
-                st.session_state.rul_upper = rul_upper
-                st.session_state.risks = risks
-                st.session_state.anomaly_scores = anomaly_scores
-                st.session_state.recommendation = recommendation
-                st.session_state.processed_df = processed_df
-                st.session_state.selected_cycle = selected_cycle
-                st.session_state.selected_dataset = selected_dataset
-                st.session_state.artifacts = artifacts
-
         if st.session_state.get('prediction_done', False):
+            if predict_button:
+                features = get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts)
+
+                if features is None:
+                    st.error("Could not extract features for prediction")
+                    return
+
+                with st.spinner("Making predictions..."):
+                    rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
+                    risks = predict_failure_risk(features, selected_dataset, artifacts)
+                    anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
+                    recommendation = make_recommendation(
+                        rul_pred, rul_lower, rul_upper,
+                        risks, anomaly_scores, selected_dataset, artifacts
+                    )
+
+                    st.session_state.rul_pred = rul_pred
+                    st.session_state.rul_lower = rul_lower
+                    st.session_state.rul_upper = rul_upper
+                    st.session_state.risks = risks
+                    st.session_state.anomaly_scores = anomaly_scores
+                    st.session_state.recommendation = recommendation
+                    st.session_state.processed_df = processed_df
+                    st.session_state.selected_cycle = selected_cycle
+                    st.session_state.selected_dataset = selected_dataset
+                    st.session_state.artifacts = artifacts
+
             rul_pred = st.session_state.rul_pred
             rul_lower = st.session_state.rul_lower
             rul_upper = st.session_state.rul_upper
