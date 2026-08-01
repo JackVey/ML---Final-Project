@@ -820,6 +820,68 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 
     return df_out
 
+# def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#
+#     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+#
+#     if len(engine_df) == 0:
+#         return pd.DataFrame()
+#
+#     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+#     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+#
+#     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+#     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+#     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
+#
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
+#
+#     engine_df_raw = engine_df.copy()
+#
+#     feature_info = ds_artifacts['feature_info']
+#     features_to_scale = feature_info['all_features']
+#     scaler = ds_artifacts['scaler']
+#
+#     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
+#     if dropped_sensors:
+#         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+#         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
+#
+#     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
+#
+#     if dataset == 'FD001':
+#         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
+#     else:
+#         op_settings = feature_info['op_settings']
+#         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
+#
+#         scaler_dict = ds_artifacts['scaler_dict']
+#         kmeans = ds_artifacts['kmeans']
+#
+#         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
+#
+#         for col in sensor_cols:
+#             engine_df[col] = engine_df[col].astype(float)
+#
+#         for r in range(6):
+#             regime_mask = engine_df['regime'] == r
+#             if regime_mask.sum() > 0 and r in scaler_dict:
+#                 engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+#                     engine_df.loc[regime_mask, sensor_cols])
+#
+#     window_info = ds_artifacts['window_info']
+#     feature_cols = window_info['feature_cols']
+#     active_cols = [col for col in feature_cols if col in engine_df.columns]
+#     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
+#
+#     for col in sensor_cols:
+#         if col in engine_df_raw.columns:
+#             engine_df[col + '_raw'] = engine_df_raw[col]
+#
+#     return engine_df
+
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
 
@@ -850,6 +912,7 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
+    sensor_cols = sorted(sensor_cols)
 
     if dataset == 'FD001':
         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
@@ -868,8 +931,11 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         for r in range(6):
             regime_mask = engine_df['regime'] == r
             if regime_mask.sum() > 0 and r in scaler_dict:
-                engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
-                    engine_df.loc[regime_mask, sensor_cols])
+                try:
+                    engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+                        engine_df.loc[regime_mask, sensor_cols])
+                except Exception as e:
+                    pass
 
     window_info = ds_artifacts['window_info']
     feature_cols = window_info['feature_cols']
@@ -881,7 +947,6 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
             engine_df[col + '_raw'] = engine_df_raw[col]
 
     return engine_df
-
 
 def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
     current_row = processed_df[processed_df['cycle'] == selected_cycle]
@@ -1309,6 +1374,96 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
     return features
 
 
+def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
+    """بررسی مرحله به مرحله preprocessing"""
+
+    st.write("### 🔍 Detailed Preprocessing Debug")
+
+    test_df, rul_df = load_raw_data(dataset)
+
+    # مرحله 1: داده خام
+    raw_data = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+    if len(raw_data) == 0:
+        st.error("Raw data not found!")
+        return
+
+    st.write("#### Step 1: Raw Data")
+    raw_sensors = {}
+    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+        if col in raw_data.columns:
+            raw_sensors[col] = raw_data[col].values[0]
+    st.dataframe(pd.DataFrame([raw_sensors]).T, columns=['Raw Value'])
+
+    # مرحله 2: بررسی scaler_dict
+    st.write("#### Step 2: Scaler Dict Check")
+    scaler_dict = artifacts[dataset]['scaler_dict']
+    st.write(f"Available scalers: {list(scaler_dict.keys())}")
+
+    # مرحله 3: بررسی kmeans
+    st.write("#### Step 3: KMeans Check")
+    kmeans = artifacts[dataset]['kmeans']
+    op_settings = ['op_setting_1', 'op_setting_2', 'op_setting_3']
+    regime = kmeans.predict(raw_data[op_settings].values.reshape(1, -1))[0]
+    st.write(f"Predicted Regime: {regime}")
+
+    # مرحله 4: اعمال scaling با scaler_dict
+    st.write("#### Step 4: Scaling Check")
+    scaler = scaler_dict[regime]
+    sensor_cols = [col for col in raw_data.columns if col.startswith('sensor_')]
+    raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
+
+    # حذف nan و inf
+    raw_sensor_values = np.nan_to_num(raw_sensor_values, nan=0.0, posinf=0.0, neginf=0.0)
+
+    try:
+        scaled_values = scaler.transform(raw_sensor_values)[0]
+        scaled_dict = {}
+        for i, col in enumerate(sensor_cols):
+            scaled_dict[col] = scaled_values[i]
+        st.dataframe(pd.DataFrame([scaled_dict]).T, columns=['Scaled by scaler_dict'])
+    except Exception as e:
+        st.error(f"Scaling error: {e}")
+        st.write(f"Raw values shape: {raw_sensor_values.shape}")
+        st.write(f"scaler mean shape: {scaler.mean_.shape}")
+
+    # مرحله 5: مقایسه با مقادیر نوت‌بوک
+    st.write("#### Step 5: Comparison with Notebook")
+    notebook_values = {
+        'sensor_1': 0.0,
+        'sensor_2': -0.02085,
+        'sensor_3': 0.125843,
+        'sensor_4': -0.101434,
+        'sensor_6': -0.17469,
+        'sensor_7': 1.840167,
+    }
+
+    comparison = []
+    if 'scaled_dict' in locals():
+        for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+            if col in scaled_dict and col in notebook_values:
+                app_val = scaled_dict[col]
+                nb_val = notebook_values[col]
+                comparison.append({
+                    'Sensor': col,
+                    'Notebook': nb_val,
+                    'App': app_val,
+                    'Diff': abs(app_val - nb_val),
+                    'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
+                })
+        st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+
+    # مرحله 6: بررسی op_settings scaling
+    st.write("#### Step 6: Op Settings Check")
+    scaler_global = artifacts[dataset]['scaler']
+    op_values = raw_data[op_settings].values.reshape(1, -1)
+    op_scaled = scaler_global.transform(op_values)[0]
+    op_dict = {}
+    for i, col in enumerate(op_settings):
+        op_dict[col] = op_scaled[i]
+    st.dataframe(pd.DataFrame([op_dict]).T, columns=['Scaled Op Settings'])
+
+    return regime
+
 def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
     """بررسی scaling در app"""
 
@@ -1666,6 +1821,14 @@ def main():
         with col2:
             if st.button("Run Feature Comparison", key="debug_features_btn"):
                 debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+
+    # در بخش Debug Tools
+    with st.expander("🔧 Debug Tools"):
+        debug_engine = st.number_input("Debug Engine ID", value=68, step=1)
+        debug_cycle = st.number_input("Debug Cycle", value=150, step=1)
+
+        if st.button("Run Step-by-Step Debug"):
+            debug_preprocessing_steps(selected_dataset, debug_engine, debug_cycle, artifacts)
 
 
 if __name__ == "__main__":
