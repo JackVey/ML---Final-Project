@@ -806,12 +806,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
 
-            df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
-                lambda x: x.ewm(span=W, adjust=False).mean()
-            ).reset_index(level=0, drop=True)
-
-            df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
-
             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
                 raw=True
