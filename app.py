@@ -883,6 +883,12 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 #     return engine_df
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+    # ==========================================
+    # DEBUG: VERSION CHECK
+    # ==========================================
+    st.write("### 🔍 DEBUG: preprocess_engine_data version")
+    st.write("Version: 2.0 - WITH natural sorting (key=lambda x: int(x.split('_')[1]))")
+    # ==========================================
     ds_artifacts = artifacts[dataset]
 
     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
