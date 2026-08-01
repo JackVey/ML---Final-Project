@@ -954,12 +954,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 #     return engine_df
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
-    # ==========================================
-    # DEBUG: VERSION CHECK
-    # ==========================================
-    st.write("### 🔍 DEBUG: preprocess_engine_data version")
-    st.write("Version: 2.0 - WITH natural sorting (key=lambda x: int(x.split('_')[1]))")
-    # ==========================================
     ds_artifacts = artifacts[dataset]
 
     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
@@ -989,13 +983,11 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
     # ==========================================
-    # ✅ استفاده از active_sensors به جای همه سنسورها
+    # ✅ استفاده از active_sensors (فقط سنسورهای غیر flatline)
     # ==========================================
     active_sensors = feature_info['active_sensors']
     sensor_cols = [col for col in active_sensors if col in engine_df.columns]
     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
-    st.write("### 🔍 DEBUG: sensor_cols after natural sort (active sensors only)")
-    st.write(f"sensor_cols: {sensor_cols[:10]}...")
     # ==========================================
 
     if dataset == 'FD001':
@@ -1031,6 +1023,7 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
             engine_df[col + '_raw'] = engine_df_raw[col]
 
     return engine_df
+
 
 def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
     current_row = processed_df[processed_df['cycle'] == selected_cycle]
