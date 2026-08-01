@@ -1316,8 +1316,24 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
         st.error(f"Engine {engine_id}, Cycle {cycle} not found!")
         return
 
+    # ==========================================
+    # 🔍 بررسی feature_names
+    # ==========================================
+    st.write("### 🔍 Checking feature_names")
     feature_names = artifacts[dataset]['feature_names']
-    expected_features = feature_names['all_features']
+    all_features = feature_names['all_features']
+    st.write(f"Total features in feature_names: {len(all_features)}")
+    st.write(f"First 20 features: {all_features[:20]}")
+
+    # بررسی تطابق با ستون‌های processed_df
+    missing_in_processed = [col for col in all_features if col not in processed_df.columns]
+    if missing_in_processed:
+        st.warning(f"⚠️ Missing {len(missing_in_processed)} features in processed_df: {missing_in_processed[:10]}...")
+    else:
+        st.success("✅ All features exist in processed_df")
+    # ==========================================
+
+    expected_features = all_features
 
     st.write(f"**Expected features count:** {len(expected_features)}")
 
@@ -1384,7 +1400,6 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
     st.write(f"**True RUL (Notebook):** 124")
 
     return features
-
 
 def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
     """بررسی مرحله به مرحله preprocessing"""
