@@ -651,6 +651,1559 @@
 # if __name__ == "__main__":
 #     main()
 
+
+
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import joblib
+# import json
+# import plotly.graph_objects as go
+# from plotly.subplots import make_subplots
+# import warnings
+#
+# warnings.filterwarnings('ignore')
+#
+# st.set_page_config(
+#     page_title="Jet Engine Early Warning System",
+#     page_icon="🛩️",
+#     layout="wide"
+# )
+#
+#
+# @st.cache_resource
+# def load_artifacts():
+#     artifacts = {}
+#
+#     with open('saved_artifacts/available_datasets.json', 'r') as f:
+#         artifacts['available_datasets'] = json.load(f)
+#
+#     for dataset in ['FD001', 'FD002']:
+#         artifacts[dataset] = {}
+#         ds_info = artifacts['available_datasets'][dataset]
+#
+#         artifacts[dataset]['scaler'] = joblib.load(f'saved_artifacts/{ds_info["scaler"]}')
+#         artifacts[dataset]['xgb_model'] = joblib.load(f'saved_artifacts/{ds_info["xgb_model"]}')
+#         artifacts[dataset]['calibrated_models'] = joblib.load(f'saved_artifacts/{ds_info["calibrated_models"]}')
+#         artifacts[dataset]['anomaly_models'] = joblib.load(f'saved_artifacts/{ds_info["anomaly_models"]}')
+#         artifacts[dataset]['feature_info'] = joblib.load(f'saved_artifacts/{ds_info["feature_info"]}')
+#         artifacts[dataset]['window_info'] = joblib.load(f'saved_artifacts/{ds_info["window_info"]}')
+#         artifacts[dataset]['conformal_params'] = joblib.load(f'saved_artifacts/{ds_info["conformal_params"]}')
+#         artifacts[dataset]['tuned_thresholds'] = joblib.load(f'saved_artifacts/{ds_info["tuned_thresholds"]}')
+#         artifacts[dataset]['decision_params'] = joblib.load(f'saved_artifacts/{ds_info["decision_params"]}')
+#         artifacts[dataset]['rul_params'] = joblib.load(f'saved_artifacts/{ds_info["rul_params"]}')
+#         artifacts[dataset]['pct_scores_test'] = joblib.load(f'saved_artifacts/{ds_info["pct_scores_test"]}')
+#         artifacts[dataset]['pct_scores_val'] = joblib.load(f'saved_artifacts/{ds_info["pct_scores_val"]}')
+#
+#         if 'feature_names' in ds_info:
+#             artifacts[dataset]['feature_names'] = joblib.load(f'saved_artifacts/{ds_info["feature_names"]}')
+#         else:
+#             artifacts[dataset]['feature_names'] = None
+#
+#         with open(f'saved_artifacts/{ds_info["metadata"]}', 'r') as f:
+#             artifacts[dataset]['metadata'] = json.load(f)
+#
+#         if dataset == 'FD002':
+#             artifacts[dataset]['scaler_dict'] = joblib.load(f'saved_artifacts/{ds_info["scaler_dict"]}')
+#             artifacts[dataset]['kmeans'] = joblib.load(f'saved_artifacts/{ds_info["kmeans"]}')
+#
+#     return artifacts
+#
+#
+# @st.cache_data
+# def load_raw_data(dataset):
+#     col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
+#                                                                                      range(1, 22)]
+#     test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
+#     rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
+#     return test_df, rul_df
+#
+#
+# # def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
+# #     window_sizes = window_info['window_sizes']
+# #     df_out = engine_df.copy()
+# #
+# #     if len(df_out) == 0:
+# #         return df_out
+# #
+# #     grouped = df_out.groupby('engine_id')
+# #
+# #     for W in window_sizes:
+# #         for col in feature_cols:
+# #             if col not in df_out.columns:
+# #                 continue
+# #
+# #             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+# #
+# #             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
+# #             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+# #             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
+# #             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+# #
+# #             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
+# #                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
+# #                 raw=True
+# #             )
+# #             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+# #
+# #     return df_out
+#
+#
+# # def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
+# #     window_sizes = window_info['window_sizes']
+# #     df_out = engine_df.copy()
+# #
+# #     if len(df_out) == 0:
+# #         return df_out
+# #
+# #     grouped = df_out.groupby('engine_id')
+# #
+# #     for W in window_sizes:
+# #         for col in feature_cols:
+# #             if col not in df_out.columns:
+# #                 continue
+# #
+# #             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+# #
+# #             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
+# #             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+# #             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
+# #             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+# #
+# #             # ========== اضافه کردن EWMA و DIFF ==========
+# #             df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
+# #                 lambda x: x.ewm(span=W, adjust=False).mean()
+# #             ).reset_index(level=0, drop=True)
+# #
+# #             df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
+# #             # ============================================
+# #
+# #             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
+# #                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
+# #                 raw=True
+# #             )
+# #             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+# #
+# #     return df_out
+#
+#
+# def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
+#     window_sizes = window_info['window_sizes']
+#     df_out = engine_df.copy()
+#
+#     if len(df_out) == 0:
+#         return df_out
+#
+#     grouped = df_out.groupby('engine_id')
+#
+#     for W in window_sizes:
+#         for col in feature_cols:
+#             if col not in df_out.columns:
+#                 continue
+#
+#             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+#
+#             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+#             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+#
+#             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
+#                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
+#                 raw=True
+#             )
+#             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+#
+#     return df_out
+#
+# # def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+# #     ds_artifacts = artifacts[dataset]
+# #
+# #     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+# #
+# #     if len(engine_df) == 0:
+# #         return pd.DataFrame()
+# #
+# #     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+# #     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+# #
+# #     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+# #     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+# #     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
+# #
+# #     rul_cap = ds_artifacts['rul_params']['rul_cap']
+# #     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
+# #
+# #     engine_df_raw = engine_df.copy()
+# #
+# #     feature_info = ds_artifacts['feature_info']
+# #     features_to_scale = feature_info['all_features']
+# #     scaler = ds_artifacts['scaler']
+# #
+# #     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
+# #     if dropped_sensors:
+# #         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+# #         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
+# #
+# #     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
+# #
+# #     if dataset == 'FD001':
+# #         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
+# #     else:
+# #         op_settings = feature_info['op_settings']
+# #         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
+# #
+# #         scaler_dict = ds_artifacts['scaler_dict']
+# #         kmeans = ds_artifacts['kmeans']
+# #
+# #         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
+# #
+# #         for col in sensor_cols:
+# #             engine_df[col] = engine_df[col].astype(float)
+# #
+# #         for r in range(6):
+# #             regime_mask = engine_df['regime'] == r
+# #             if regime_mask.sum() > 0 and r in scaler_dict:
+# #                 engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+# #                     engine_df.loc[regime_mask, sensor_cols])
+# #
+# #     window_info = ds_artifacts['window_info']
+# #     feature_cols = window_info['feature_cols']
+# #     active_cols = [col for col in feature_cols if col in engine_df.columns]
+# #     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
+# #
+# #     for col in sensor_cols:
+# #         if col in engine_df_raw.columns:
+# #             engine_df[col + '_raw'] = engine_df_raw[col]
+# #
+# #     return engine_df
+# # def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+# #     # ==========================================
+# #     # DEBUG: VERSION CHECK
+# #     # ==========================================
+# #     st.write("### 🔍 DEBUG: preprocess_engine_data version")
+# #     st.write("Version: 2.0 - WITH natural sorting (key=lambda x: int(x.split('_')[1]))")
+# #     # ==========================================
+# #     ds_artifacts = artifacts[dataset]
+# #
+# #     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+# #
+# #     if len(engine_df) == 0:
+# #         return pd.DataFrame()
+# #
+# #     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+# #     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+# #
+# #     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+# #     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+# #     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
+# #
+# #     rul_cap = ds_artifacts['rul_params']['rul_cap']
+# #     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
+# #
+# #     engine_df_raw = engine_df.copy()
+# #
+# #     feature_info = ds_artifacts['feature_info']
+# #     features_to_scale = feature_info['all_features']
+# #     scaler = ds_artifacts['scaler']
+# #
+# #     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
+# #     if dropped_sensors:
+# #         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+# #         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
+# #
+# #     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
+# #     # ==========================================
+# #     # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
+# #     # ==========================================
+# #     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
+# #     st.write("### 🔍 DEBUG: sensor_cols after natural sort")
+# #     st.write(f"sensor_cols: {sensor_cols[:10]}...")
+# #     # ==========================================
+# #
+# #     if dataset == 'FD001':
+# #         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
+# #     else:
+# #         op_settings = feature_info['op_settings']
+# #         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
+# #
+# #         scaler_dict = ds_artifacts['scaler_dict']
+# #         kmeans = ds_artifacts['kmeans']
+# #
+# #         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
+# #
+# #         for col in sensor_cols:
+# #             engine_df[col] = engine_df[col].astype(float)
+# #
+# #         for r in range(6):
+# #             regime_mask = engine_df['regime'] == r
+# #             if regime_mask.sum() > 0 and r in scaler_dict:
+# #                 try:
+# #                     engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+# #                         engine_df.loc[regime_mask, sensor_cols])
+# #                 except Exception as e:
+# #                     pass
+# #
+# #     window_info = ds_artifacts['window_info']
+# #     feature_cols = window_info['feature_cols']
+# #     active_cols = [col for col in feature_cols if col in engine_df.columns]
+# #     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
+# #
+# #     for col in sensor_cols:
+# #         if col in engine_df_raw.columns:
+# #             engine_df[col + '_raw'] = engine_df_raw[col]
+# #
+# #     return engine_df
+#
+# def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#
+#     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+#
+#     if len(engine_df) == 0:
+#         return pd.DataFrame()
+#
+#     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
+#     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
+#
+#     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+#     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+#     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
+#
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
+#
+#     engine_df_raw = engine_df.copy()
+#
+#     feature_info = ds_artifacts['feature_info']
+#     features_to_scale = feature_info['all_features']
+#     scaler = ds_artifacts['scaler']
+#
+#     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
+#     if dropped_sensors:
+#         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+#         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
+#
+#     # ==========================================
+#     # ✅ استفاده از active_sensors (فقط سنسورهای غیر flatline)
+#     # ==========================================
+#     active_sensors = feature_info['active_sensors']
+#     sensor_cols = [col for col in active_sensors if col in engine_df.columns]
+#     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
+#     # ==========================================
+#
+#     if dataset == 'FD001':
+#         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
+#     else:
+#         op_settings = feature_info['op_settings']
+#         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
+#
+#         scaler_dict = ds_artifacts['scaler_dict']
+#         kmeans = ds_artifacts['kmeans']
+#
+#         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
+#
+#         for col in sensor_cols:
+#             engine_df[col] = engine_df[col].astype(float)
+#
+#         for r in range(6):
+#             regime_mask = engine_df['regime'] == r
+#             if regime_mask.sum() > 0 and r in scaler_dict:
+#                 try:
+#                     engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
+#                         engine_df.loc[regime_mask, sensor_cols])
+#                 except Exception as e:
+#                     pass
+#
+#     window_info = ds_artifacts['window_info']
+#     feature_cols = window_info['feature_cols']
+#     active_cols = [col for col in feature_cols if col in engine_df.columns]
+#     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
+#
+#     for col in sensor_cols:
+#         if col in engine_df_raw.columns:
+#             engine_df[col + '_raw'] = engine_df_raw[col]
+#
+#     return engine_df
+#
+#
+# def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
+#     current_row = processed_df[processed_df['cycle'] == selected_cycle]
+#
+#     if len(current_row) == 0:
+#         return None
+#
+#     feature_names = artifacts[selected_dataset]['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     features = []
+#
+#     for col in expected_features:
+#         if col in current_row.columns:
+#             val = current_row[col].values[0]
+#             if pd.isna(val):
+#                 val = 0.0
+#             features.append(float(val))
+#         else:
+#             features.append(0.0)
+#
+#     return np.array(features)
+#
+#
+# # def predict_rul(features, dataset, artifacts):
+# #     ds_artifacts = artifacts[dataset]
+# #     model = ds_artifacts['xgb_model']
+# #     conformal_params = ds_artifacts['conformal_params']
+# #
+# #     feature_names = ds_artifacts['feature_names']
+# #     expected_features = feature_names['all_features']
+# #
+# #     if len(features) != len(expected_features):
+# #         if len(features) < len(expected_features):
+# #             padded = np.zeros(len(expected_features))
+# #             padded[:len(features)] = features
+# #             features = padded
+# #         else:
+# #             features = features[:len(expected_features)]
+# #
+# #     pred = model.predict(features.reshape(1, -1))[0]
+# #     rul_cap = ds_artifacts['rul_params']['rul_cap']
+# #     pred_capped = np.clip(pred, None, rul_cap)
+# #
+# #     if pred_capped <= 50:
+# #         q = conformal_params['q_95_near_failure']
+# #     elif pred_capped <= 100:
+# #         q = conformal_params['q_95_mid_life']
+# #     else:
+# #         q = conformal_params['q_95_early_life']
+# #
+# #     lower = max(0, pred_capped - q)
+# #     upper = pred_capped + q
+# #
+# #     return pred_capped, lower, upper
+#
+# # def predict_rul(features, dataset, artifacts):
+# #     ds_artifacts = artifacts[dataset]
+# #     model = ds_artifacts['xgb_model']
+# #     conformal_params = ds_artifacts['conformal_params']
+# #
+# #     feature_names = ds_artifacts['feature_names']
+# #     expected_features = feature_names['all_features']
+# #
+# #     # ========== DEBUG ==========
+# #     st.write("### DEBUG: predict_rul")
+# #     st.write(f"Dataset: {dataset}")
+# #     st.write(f"Features length: {len(features)}")
+# #     st.write(f"Expected features length: {len(expected_features)}")
+# #
+# #     if len(features) != len(expected_features):
+# #         st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
+# #         if len(features) < len(expected_features):
+# #             padded = np.zeros(len(expected_features))
+# #             padded[:len(features)] = features
+# #             features = padded
+# #             st.write(f"  Padded to {len(features)}")
+# #         else:
+# #             features = features[:len(expected_features)]
+# #             st.write(f"  Truncated to {len(expected_features)}")
+# #
+# #     # نمایش چند ویژگی اول برای بررسی
+# #     st.write(f"First 5 features: {features[:5]}")
+# #     st.write(f"Feature names (first 5): {expected_features[:5]}")
+# #     # ===========================
+# #
+# #     pred = model.predict(features.reshape(1, -1))[0]
+# #     rul_cap = ds_artifacts['rul_params']['rul_cap']
+# #     pred_capped = np.clip(pred, None, rul_cap)
+# #
+# #     st.write(f"Raw prediction: {pred:.2f}")
+# #     st.write(f"Capped prediction: {pred_capped:.2f}")
+# #
+# #     if pred_capped <= 50:
+# #         q = conformal_params['q_95_near_failure']
+# #     elif pred_capped <= 100:
+# #         q = conformal_params['q_95_mid_life']
+# #     else:
+# #         q = conformal_params['q_95_early_life']
+# #
+# #     lower = max(0, pred_capped - q)
+# #     upper = pred_capped + q
+# #
+# #     st.write(f"q_95: {q:.2f}")
+# #     st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
+# #
+# #     return pred_capped, lower, upper
+#
+# def predict_rul(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     model = ds_artifacts['xgb_model']
+#     conformal_params = ds_artifacts['conformal_params']
+#
+#     feature_names = ds_artifacts['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     # ============================================================
+#     # 📋 DEBUG: Prediction Pipeline (Step-by-Step)
+#     # ============================================================
+#     st.write("=" * 60)
+#     st.write("🔍 PREDICTION PIPELINE DEBUG (APP)")
+#     st.write("=" * 60)
+#
+#     st.write(f"📌 Dataset          : {dataset}")
+#     st.write(f"📌 Features length  : {len(features)}")
+#     st.write(f"📌 Expected features: {len(expected_features)}")
+#
+#     if len(features) != len(expected_features):
+#         st.write(f"⚠️ Feature mismatch! Adjusting...")
+#         if len(features) < len(expected_features):
+#             features = np.pad(features, (0, len(expected_features) - len(features)))
+#             st.write(f"   → Padded to {len(features)}")
+#         else:
+#             features = features[:len(expected_features)]
+#             st.write(f"   → Truncated to {len(expected_features)}")
+#
+#     st.write("\n--- First 10 Features (App) ---")
+#     for i in range(10):
+#         st.write(f"  {i:2d}. {expected_features[i]:<20} = {features[i]:.6f}")
+#
+#     # ============================================================
+#     # 🧠 Model Prediction
+#     # ============================================================
+#     st.write("\n🧠 Running XGBoost model...")
+#     pred = model.predict(features.reshape(1, -1))[0]
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     pred_capped = np.clip(pred, None, rul_cap)
+#
+#     st.write(f"  Raw prediction   : {pred:.2f}")
+#     st.write(f"  Capped prediction: {pred_capped:.2f} (cap={rul_cap})")
+#
+#     # ============================================================
+#     # 📐 Conformal Prediction (Uncertainty)
+#     # ============================================================
+#     st.write("\n📐 Conformal Prediction (q_95):")
+#     if pred_capped <= 50:
+#         q = conformal_params['q_95_near_failure']
+#         region = "Near-failure (RUL≤50)"
+#     elif pred_capped <= 100:
+#         q = conformal_params['q_95_mid_life']
+#         region = "Mid-life (50<RUL≤100)"
+#     else:
+#         q = conformal_params['q_95_early_life']
+#         region = "Early-life (RUL>100)"
+#
+#     lower = max(0, pred_capped - q)
+#     upper = pred_capped + q
+#
+#     st.write(f"  Region        : {region}")
+#     st.write(f"  q_95          : {q:.2f}")
+#     st.write(f"  Confidence Int: [{lower:.2f}, {upper:.2f}]")
+#     st.write("=" * 60)
+#
+#     return pred_capped, lower, upper
+#
+# def predict_failure_risk(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     calibrated_models = ds_artifacts['calibrated_models']
+#     tuned_thresholds = ds_artifacts['tuned_thresholds']
+#     horizons = [10, 20, 30]
+#
+#     feature_names = ds_artifacts['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     if len(features) != len(expected_features):
+#         if len(features) < len(expected_features):
+#             padded = np.zeros(len(expected_features))
+#             padded[:len(features)] = features
+#             features = padded
+#         else:
+#             features = features[:len(expected_features)]
+#
+#     # ========== DEBUG: predict_failure_risk ==========
+#     st.write("### DEBUG: predict_failure_risk")
+#     st.write(f"Dataset: {dataset}")
+#     st.write(f"tuned_thresholds type: {type(tuned_thresholds)}")
+#     if tuned_thresholds is not None:
+#         st.write(f"tuned_thresholds keys: {list(tuned_thresholds.keys())}")
+#         for key in list(tuned_thresholds.keys())[:5]:
+#             st.write(f"  {key}: {tuned_thresholds[key]}")
+#     else:
+#         st.write("tuned_thresholds is None")
+#     st.write("---")
+#
+#     risks = {}
+#     for h in horizons:
+#         model = calibrated_models[h]['XGBoost']
+#         prob = model.predict_proba(features.reshape(1, -1))[0, 1]
+#
+#         st.write(f"Horizon {h}: prob = {prob:.4f}")
+#
+#         if str(h) in tuned_thresholds:
+#             threshold = tuned_thresholds[str(h)]['XGBoost']
+#             st.write(f"  Found in str({h}): {threshold}")
+#         elif h in tuned_thresholds:
+#             threshold = tuned_thresholds[h]['XGBoost']
+#             st.write(f"  Found in {h}: {threshold}")
+#         else:
+#             threshold = 0.05
+#             st.write(f"  NOT found, using default: {threshold}")
+#
+#         risks[f'h{h}'] = {
+#             'probability': prob,
+#             'threshold': threshold,
+#             'alert': prob >= threshold
+#         }
+#
+#     st.write("---")
+#     return risks
+#
+#
+# def predict_anomaly(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     anomaly_models = ds_artifacts['anomaly_models']
+#     pct_scores_test = ds_artifacts['pct_scores_test']
+#
+#     feature_names = ds_artifacts['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     if len(features) != len(expected_features):
+#         if len(features) < len(expected_features):
+#             padded = np.zeros(len(expected_features))
+#             padded[:len(features)] = features
+#             features = padded
+#         else:
+#             features = features[:len(expected_features)]
+#
+#     # ========== DEBUG: predict_anomaly ==========
+#     st.write("### DEBUG: predict_anomaly")
+#     st.write(f"Dataset: {dataset}")
+#     st.write(f"anomaly_models keys: {list(anomaly_models.keys())}")
+#     st.write(f"pct_scores_test type: {type(pct_scores_test)}")
+#     if pct_scores_test is not None:
+#         st.write(f"pct_scores_test keys: {list(pct_scores_test.keys())}")
+#         for key in pct_scores_test.keys():
+#             if pct_scores_test[key] is not None:
+#                 st.write(f"  {key}: length={len(pct_scores_test[key])}, min={np.min(pct_scores_test[key]):.3f}, max={np.max(pct_scores_test[key]):.3f}")
+#             else:
+#                 st.write(f"  {key}: None")
+#     else:
+#         st.write("pct_scores_test is None")
+#     st.write("---")
+#
+#     scores = {}
+#     for name, model in anomaly_models.items():
+#         try:
+#             if name == 'PCA':
+#                 transformed = model.transform(features.reshape(1, -1))
+#                 reconstructed = model.inverse_transform(transformed)
+#                 raw_score = np.mean((features.reshape(1, -1) - reconstructed) ** 2, axis=1)[0]
+#             else:
+#                 raw_score = -model.decision_function(features.reshape(1, -1))[0]
+#
+#             st.write(f"Model {name}: raw_score = {raw_score:.4f}")
+#
+#             if pct_scores_test is not None and name in pct_scores_test:
+#                 ref_scores = pct_scores_test[name]
+#                 if ref_scores is not None and len(ref_scores) > 0:
+#                     if raw_score >= np.max(ref_scores):
+#                         percentile = 100.0
+#                     elif raw_score <= np.min(ref_scores):
+#                         percentile = 0.0
+#                     else:
+#                         percentile = float(np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores))))
+#                     st.write(f"  percentile = {percentile:.2f} (from {len(ref_scores)} ref_scores)")
+#                 else:
+#                     percentile = 50.0
+#                     st.write(f"  ref_scores is empty, using default: {percentile}")
+#             else:
+#                 percentile = 50.0
+#                 st.write(f"  pct_scores_test[{name}] not found, using default: {percentile}")
+#
+#             scores[name] = {
+#                 'raw_score': float(raw_score),
+#                 'percentile': float(percentile),
+#                 'alert': percentile >= 95
+#             }
+#         except Exception as e:
+#             st.write(f"  ERROR in {name}: {str(e)}")
+#             scores[name] = {
+#                 'raw_score': 0.0,
+#                 'percentile': 50.0,
+#                 'alert': False
+#             }
+#
+#     st.write("---")
+#     return scores
+#
+# def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
+#     prob_h30 = failure_risks['h30']['probability']
+#     anomaly_score = anomaly_scores['OCSVM']['percentile']
+#     interval_width = rul_upper - rul_lower
+#
+#     decision_params = artifacts[dataset]['decision_params']
+#     final_thresholds = decision_params['final_thresholds']
+#
+#     if (rul_pred <= final_thresholds['rul_stop']) or \
+#             (rul_lower <= 30) or \
+#             ((prob_h30 > final_thresholds['prob_stop']) and (anomaly_score > final_thresholds['anomaly_stop'])):
+#
+#         triggers = []
+#         if rul_pred <= final_thresholds['rul_stop']:
+#             triggers.append(f"RUL prediction ({rul_pred:.0f}) below STOP threshold ({final_thresholds['rul_stop']})")
+#         if rul_lower <= 30:
+#             triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold (30)")
+#         if (prob_h30 > final_thresholds['prob_stop']) and (anomaly_score > final_thresholds['anomaly_stop']):
+#             triggers.append(f"Failure probability ({prob_h30:.1%}) and Anomaly ({anomaly_score:.1f}) above thresholds")
+#
+#         return {
+#             'action': 'STOP',
+#             'color': 'red',
+#             'triggers': triggers,
+#             'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
+#         }
+#
+#     elif (rul_pred <= final_thresholds['rul_inspect']) or \
+#             (rul_lower <= final_thresholds['rul_inspect_lower']) or \
+#             ((prob_h30 > final_thresholds['prob_inspect']) and (anomaly_score > final_thresholds['anomaly_inspect'])):
+#
+#         triggers = []
+#         if rul_pred <= final_thresholds['rul_inspect']:
+#             triggers.append(
+#                 f"RUL prediction ({rul_pred:.0f}) below INSPECT threshold ({final_thresholds['rul_inspect']})")
+#         if rul_lower <= final_thresholds['rul_inspect_lower']:
+#             triggers.append(
+#                 f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({final_thresholds['rul_inspect_lower']})")
+#         if (prob_h30 > final_thresholds['prob_inspect']) and (anomaly_score > final_thresholds['anomaly_inspect']):
+#             triggers.append(f"Failure probability ({prob_h30:.1%}) and Anomaly ({anomaly_score:.1f}) above thresholds")
+#
+#         return {
+#             'action': 'INSPECT',
+#             'color': 'orange',
+#             'triggers': triggers,
+#             'confidence': 'MEDIUM'
+#         }
+#
+#     elif (prob_h30 > final_thresholds['monitor_prob']) or (anomaly_score > 85):
+#         triggers = []
+#         if prob_h30 > final_thresholds['monitor_prob']:
+#             triggers.append(
+#                 f"Failure probability ({prob_h30:.1%}) above monitor threshold ({final_thresholds['monitor_prob']:.0%})")
+#         if anomaly_score > 85:
+#             triggers.append(f"Anomaly score ({anomaly_score:.1f}) above warning threshold (85)")
+#
+#         return {
+#             'action': 'MONITOR',
+#             'color': 'gold',
+#             'triggers': triggers,
+#             'confidence': 'LOW'
+#         }
+#
+#     else:
+#         return {
+#             'action': 'CONTINUE',
+#             'color': 'green',
+#             'triggers': ['All parameters within normal range'],
+#             'confidence': 'HIGH'
+#         }
+#
+#
+# def get_dataset_description(dataset):
+#     descriptions = {
+#         'FD001': '1 condition, 1 fault mode',
+#         'FD002': '6 conditions, 1 fault mode'
+#     }
+#     return descriptions.get(dataset, '')
+#
+#
+# def initialize_session_state():
+#     if 'prediction_done' not in st.session_state:
+#         st.session_state.prediction_done = False
+#     if 'rul_pred' not in st.session_state:
+#         st.session_state.rul_pred = None
+#     if 'rul_lower' not in st.session_state:
+#         st.session_state.rul_lower = None
+#     if 'rul_upper' not in st.session_state:
+#         st.session_state.rul_upper = None
+#     if 'risks' not in st.session_state:
+#         st.session_state.risks = None
+#     if 'anomaly_scores' not in st.session_state:
+#         st.session_state.anomaly_scores = None
+#     if 'recommendation' not in st.session_state:
+#         st.session_state.recommendation = None
+#     if 'processed_df' not in st.session_state:
+#         st.session_state.processed_df = None
+#     if 'selected_cycle' not in st.session_state:
+#         st.session_state.selected_cycle = None
+#     if 'selected_dataset' not in st.session_state:
+#         st.session_state.selected_dataset = None
+#     if 'artifacts' not in st.session_state:
+#         st.session_state.artifacts = None
+#
+#
+# def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
+#
+#     # ==========================================
+#     # 🔍 بررسی window_info
+#     # ==========================================
+#     st.write("### 🔍 Window Info Check")
+#     window_info = artifacts[dataset]['window_info']
+#     st.write(f"Window sizes: {window_info['window_sizes']}")
+#     st.write(f"Feature cols: {len(window_info['feature_cols'])}")
+#     st.write(f"Op settings: {window_info['op_settings']}")
+#     """مقایسه مستقیم ویژگی‌های یک موتور خاص با نوت‌بوک"""
+#
+#     st.write(f"### 🔍 Debug: Engine {engine_id}, Cycle {cycle}")
+#
+#     current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
+#
+#     if len(current_row) == 0:
+#         st.error(f"Engine {engine_id}, Cycle {cycle} not found!")
+#         return
+#
+#     # ==========================================
+#     # 🔍 بررسی regime
+#     # ==========================================
+#     if 'regime' in current_row.columns:
+#         regime = current_row['regime'].values[0]
+#         st.write(f"**Regime:** {regime}")
+#     else:
+#         st.write("**Regime:** Not found in processed_df")
+#
+#     # ==========================================
+#     # 🔍 بررسی scaler_dict و مقایسه کامل سنسورها
+#     # ==========================================
+#     st.write("### 🔍 Full Comparison: All Sensors")
+#
+#     test_df, rul_df = load_raw_data(dataset)
+#     raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+#
+#     if len(raw_row) == 0:
+#         st.error("Raw data not found!")
+#         return
+#
+#     scaler_dict = artifacts[dataset]['scaler_dict']
+#     if regime in scaler_dict:
+#         scaler = scaler_dict[regime]
+#         sensor_cols = sorted([col for col in raw_row.columns if col.startswith('sensor_')],
+#                              key=lambda x: int(x.split('_')[1]))
+#         raw_values = raw_row[sensor_cols].values.reshape(1, -1)
+#         raw_values = np.nan_to_num(raw_values, nan=0.0, posinf=0.0, neginf=0.0)
+#         scaled_manual = scaler.transform(raw_values)[0]
+#
+#         comparison_data = []
+#         for i, col in enumerate(sensor_cols):
+#             if col in current_row.columns:
+#                 manual_val = float(scaled_manual[i])
+#                 app_val = float(current_row[col].values[0])
+#                 diff = abs(app_val - manual_val)
+#                 comparison_data.append({
+#                     'Sensor': col,
+#                     'Manual Scaled': manual_val,
+#                     'App Scaled': app_val,
+#                     'Diff': diff,
+#                     'Match': '✅' if diff < 0.001 else '❌'
+#                 })
+#
+#         st.dataframe(pd.DataFrame(comparison_data), hide_index=True, use_container_width=True)
+#
+#         mismatched = [row for row in comparison_data if row['Match'] == '❌']
+#         if mismatched:
+#             st.warning(f"⚠️ {len(mismatched)} sensors have mismatched values!")
+#         else:
+#             st.success("✅ All sensors match!")
+#     else:
+#         st.error(f"Regime {regime} not in scaler_dict!")
+#
+#     # ==========================================
+#     # 🔍 بررسی feature_names
+#     # ==========================================
+#     st.write("### 🔍 Checking feature_names")
+#     feature_names = artifacts[dataset]['feature_names']
+#     all_features = feature_names['all_features']
+#     st.write(f"Total features in feature_names: {len(all_features)}")
+#     st.write(f"First 20 features: {all_features[:20]}")
+#
+#     missing_in_processed = [col for col in all_features if col not in processed_df.columns]
+#     if missing_in_processed:
+#         st.warning(f"⚠️ Missing {len(missing_in_processed)} features in processed_df: {missing_in_processed[:10]}...")
+#     else:
+#         st.success("✅ All features exist in processed_df")
+#
+#     expected_features = all_features
+#
+#     st.write(f"**Expected features count:** {len(expected_features)}")
+#
+#     # استخراج ویژگی‌ها
+#     features = []
+#     missing = []
+#     for col in expected_features:
+#         if col in current_row.columns:
+#             val = current_row[col].values[0]
+#             if pd.isna(val):
+#                 val = 0.0
+#             features.append(float(val))
+#         else:
+#             features.append(0.0)
+#             missing.append(col)
+#
+#     st.write(f"**Extracted features count:** {len(features)}")
+#
+#     if missing:
+#         st.warning(f"⚠️ Missing {len(missing)} features: {missing[:5]}...")
+#
+#     # نمایش 10 ویژگی اول
+#     st.write("### First 10 features (App):")
+#     for i, col in enumerate(expected_features[:10]):
+#         st.write(f"  {i}: {col} = {features[i]:.6f}")
+#
+#     # مقایسه با مقادیر نوت‌بوک (Hardcoded از خروجی نوت‌بوک)
+#     notebook_values = {
+#         'op_setting_1': 0.747954,
+#         'op_setting_2': 0.865002,
+#         'op_setting_3': 0.417670,
+#         'sensor_1': 0.000000,
+#         'sensor_2': -0.020850,
+#         'sensor_3': 0.125843,
+#         'sensor_4': -0.101434,
+#         'sensor_5': -0.000000,
+#         'sensor_6': -0.174690,
+#         'sensor_7': 1.840167,
+#     }
+#
+#     st.write("### Comparison with Notebook (first 10):")
+#     comparison = []
+#     for i, col in enumerate(expected_features[:10]):
+#         if col in notebook_values:
+#             app_val = features[i]
+#             nb_val = notebook_values[col]
+#             diff = abs(app_val - nb_val)
+#             comparison.append({
+#                 'Feature': col,
+#                 'Notebook': nb_val,
+#                 'App': app_val,
+#                 'Diff': diff,
+#                 'Match': '✅' if diff < 0.001 else '❌'
+#             })
+#
+#     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+#
+#     st.write("### 🔍 Window Feature Types")
+#
+#     window_cols = [col for col in current_row.columns if any(x in col for x in
+#                                                              ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
+#                                                               '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
+#
+#     # شمارش هر نوع
+#     types = {
+#         '_roll_mean_W': 0,
+#         '_roll_std_W': 0,
+#         '_roll_min_W': 0,
+#         '_roll_max_W': 0,
+#         '_ewma_W': 0,
+#         '_diff_W': 0,
+#         '_slope_W': 0
+#     }
+#
+#     for col in window_cols:
+#         for key in types:
+#             if key in col:
+#                 types[key] += 1
+#                 break
+#
+#     st.write("Feature type counts:")
+#     for key, count in types.items():
+#         st.write(f"  {key}: {count}")
+#
+#     total = sum(types.values())
+#     st.write(f"Total: {total}")
+#
+#     if total != 525:
+#         st.warning(f"⚠️ Expected 525, got {total}")
+#
+#     # ==========================================
+#     # 🔍 بررسی مدل XGBoost
+#     # ==========================================
+#     st.write("### 🔍 XGBoost Model Check")
+#
+#     model = artifacts[dataset]['xgb_model']
+#     st.write(f"Model type: {type(model)}")
+#
+#     # بررسی پارامترهای مدل
+#     if hasattr(model, 'get_params'):
+#         params = model.get_params()
+#         st.write(f"Model parameters:")
+#         st.write(f"  n_estimators: {params.get('n_estimators', 'N/A')}")
+#         st.write(f"  max_depth: {params.get('max_depth', 'N/A')}")
+#         st.write(f"  learning_rate: {params.get('learning_rate', 'N/A')}")
+#
+#     # بررسی تعداد ویژگی‌های مورد انتظار مدل
+#     if hasattr(model, 'n_features_in_'):
+#         st.write(f"Model expected features: {model.n_features_in_}")
+#     else:
+#         st.write("Model does not have n_features_in_ attribute")
+#
+#     # پیش‌بینی با مدل
+#     features_array = np.array(features).reshape(1, -1)
+#     pred = model.predict(features_array)[0]
+#     st.write(f"**App RUL Prediction:** {pred:.2f}")
+#
+#     # ==========================================
+#     # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
+#     # ==========================================
+#
+#     st.write("### 🔍 Window Features Check")
+#
+#     window_cols = [col for col in current_row.columns if any(x in col for x in
+#                                                              ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
+#                                                               '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
+#     st.write(f"Total window features: {len(window_cols)}")
+#
+#     # ==========================================
+#     # 🔍 بررسی خروجی get_features_for_prediction
+#     # ==========================================
+#     st.write("### 🔍 Testing get_features_for_prediction")
+#
+#     features = get_features_for_prediction(processed_df, cycle, dataset, artifacts)
+#     st.write(f"Features length: {len(features)}")
+#     st.write(f"First 10 features: {features[:10]}")
+#
+#     # مقایسه با مقادیر نوت‌بوک
+#     notebook_first_10 = [
+#         0.747954,  # op_setting_1
+#         0.865002,  # op_setting_2
+#         0.417670,  # op_setting_3
+#         0.000000,  # sensor_1
+#         -0.020850,  # sensor_2
+#         0.125843,  # sensor_3
+#         -0.101434,  # sensor_4
+#         -0.000000,  # sensor_5
+#         -0.174690,  # sensor_6
+#         1.840167  # sensor_7
+#     ]
+#
+#     st.write("### Comparison with Notebook (first 10):")
+#     comparison = []
+#     for i in range(10):
+#         app_val = features[i] if i < len(features) else None
+#         nb_val = notebook_first_10[i]
+#         if app_val is not None:
+#             diff = abs(app_val - nb_val)
+#             comparison.append({
+#                 'Position': i,
+#                 'Notebook': nb_val,
+#                 'App': app_val,
+#                 'Diff': diff,
+#                 'Match': '✅' if diff < 0.001 else '❌'
+#             })
+#
+#     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+#
+#     # ==========================================
+#     # 🔍 بررسی تعداد کل ویژگی‌ها
+#     # ==========================================
+#     st.write("### 🔍 Feature Count Summary")
+#     st.write(f"Total features in expected_features: {len(expected_features)}")
+#     st.write(f"Total features in current_row: {len(current_row.columns)}")
+#
+#     non_feature_cols = ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final', 'regime']
+#     actual_feature_cols = [col for col in current_row.columns if
+#                            col not in non_feature_cols and not col.endswith('_raw')]
+#     st.write(f"Actual feature columns (excluding non-features): {len(actual_feature_cols)}")
+#
+#     # بررسی تفاوت
+#     if len(expected_features) != len(actual_feature_cols):
+#         st.warning(f"⚠️ Feature count mismatch: expected {len(expected_features)}, got {len(actual_feature_cols)}")
+#         diff_cols = set(expected_features) - set(actual_feature_cols)
+#         if diff_cols:
+#             st.write(f"Missing in actual: {list(diff_cols)[:10]}...")
+#     else:
+#         st.success("✅ Feature count matches!")
+#
+#     # پیش‌بینی RUL
+#     features_array = np.array(features).reshape(1, -1)
+#     model = artifacts[dataset]['xgb_model']
+#     pred = model.predict(features_array)[0]
+#     st.write(f"**App RUL Prediction:** {pred:.2f}")
+#     st.write(f"**Notebook RUL Prediction:** 113.53")
+#     st.write(f"**True RUL (Notebook):** 124")
+#
+#     return features
+#
+# def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
+#     """بررسی مرحله به مرحله preprocessing"""
+#
+#     st.write("### 🔍 Detailed Preprocessing Debug")
+#
+#     test_df, rul_df = load_raw_data(dataset)
+#
+#     raw_data = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+#     if len(raw_data) == 0:
+#         st.error("Raw data not found!")
+#         return
+#
+#     st.write("#### Step 1: Raw Data (First 7 sensors)")
+#     raw_sensors = {}
+#     for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
+#         if col in raw_data.columns:
+#             raw_sensors[col] = float(raw_data[col].values[0])
+#
+#     raw_df = pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value'])
+#     st.dataframe(raw_df, hide_index=True, use_container_width=True)
+#
+#     st.write("#### Step 2.5: sensor_cols comparison")
+#     sensor_cols_app = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
+#     sensor_cols_notebook = [f'sensor_{i}' for i in range(1, 22)]
+#
+#     st.write(f"sensor_cols_app: {sensor_cols_app}")
+#     st.write(f"sensor_cols_notebook: {sensor_cols_notebook}")
+#
+#     if sensor_cols_app == sensor_cols_notebook:
+#         st.write("✅ sensor_cols match!")
+#     else:
+#         st.write("❌ sensor_cols differ!")
+#         st.write(f"Missing in app: {set(sensor_cols_notebook) - set(sensor_cols_app)}")
+#         st.write(f"Extra in app: {set(sensor_cols_app) - set(sensor_cols_notebook)}")
+#
+#     st.write("#### Step 2: Scaler Dict Check")
+#     scaler_dict = artifacts[dataset]['scaler_dict']
+#     st.write(f"Available scalers: {list(scaler_dict.keys())}")
+#
+#     st.write("#### Step 3: KMeans Regime Prediction")
+#     kmeans = artifacts[dataset]['kmeans']
+#     op_settings = ['op_setting_1', 'op_setting_2', 'op_setting_3']
+#     regime = kmeans.predict(raw_data[op_settings].values.reshape(1, -1))[0]
+#     st.write(f"Predicted Regime: {regime}")
+#
+#     if regime not in scaler_dict:
+#         st.error(f"Regime {regime} not in scaler_dict!")
+#         return
+#
+#     st.write("#### Step 4: Apply scaler_dict")
+#     scaler = scaler_dict[regime]
+#     sensor_cols = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
+#     raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
+#     raw_sensor_values = np.nan_to_num(raw_sensor_values, nan=0.0, posinf=0.0, neginf=0.0)
+#
+#     try:
+#         scaled_values = scaler.transform(raw_sensor_values)[0]
+#         scaled_dict = {}
+#         for i, col in enumerate(sensor_cols):
+#             scaled_dict[col] = float(scaled_values[i])
+#
+#         scaled_df = pd.DataFrame(list(scaled_dict.items()), columns=['Sensor', 'Scaled Value'])
+#         st.dataframe(scaled_df, hide_index=True, use_container_width=True)
+#     except Exception as e:
+#         st.error(f"Scaling error: {e}")
+#         return
+#
+#     st.write("#### Step 5: Comparison with Notebook")
+#     notebook_values = {
+#         'sensor_1': 0.0,
+#         'sensor_2': -0.02085,
+#         'sensor_3': 0.125843,
+#         'sensor_4': -0.101434,
+#         'sensor_6': -0.17469,
+#         'sensor_7': 1.840167,
+#     }
+#
+#     comparison = []
+#     for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+#         if col in scaled_dict and col in notebook_values:
+#             app_val = scaled_dict[col]
+#             nb_val = notebook_values[col]
+#             comparison.append({
+#                 'Sensor': col,
+#                 'Notebook': nb_val,
+#                 'App': app_val,
+#                 'Diff': abs(app_val - nb_val),
+#                 'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
+#             })
+#
+#     if comparison:
+#         st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+#     else:
+#         st.write("No comparison data available")
+#
+#     st.write("#### Step 6: Op Settings Scaling")
+#     scaler_global = artifacts[dataset]['scaler']
+#     op_values = raw_data[op_settings].values.reshape(1, -1)
+#     op_scaled = scaler_global.transform(op_values)[0]
+#     op_dict = {}
+#     for i, col in enumerate(op_settings):
+#         op_dict[col] = float(op_scaled[i])
+#
+#     op_df = pd.DataFrame(list(op_dict.items()), columns=['Op Setting', 'Scaled Value'])
+#     st.dataframe(op_df, hide_index=True, use_container_width=True)
+#
+#     return regime
+#
+# def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
+#     """بررسی scaling در app"""
+#
+#     st.write("### 🔍 Debug: Scaling Check")
+#
+#     current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
+#
+#     if len(current_row) == 0:
+#         st.error("Not found!")
+#         return
+#
+#     # ==========================================
+#     # بررسی scaler_dict مستقیماً از آرتیفکت
+#     # ==========================================
+#     st.write("### 🔍 Checking scaler_dict from artifact")
+#
+#     scaler_dict = artifacts[dataset]['scaler_dict']
+#     st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
+#
+#     if 2 in scaler_dict:
+#         # بررسی mean و scale برای سنسورهای اول
+#         scaler = scaler_dict[2]
+#         st.write(f"**Scaler for Regime 2:**")
+#         st.write(f"  - mean (first 10): {scaler.mean_[:10] if hasattr(scaler, 'mean_') else 'N/A'}")
+#         st.write(f"  - scale (first 10): {scaler.scale_[:10] if hasattr(scaler, 'scale_') else 'N/A'}")
+#     # ==========================================
+#
+#     test_df, rul_df = load_raw_data(dataset)
+#     raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+#
+#     if len(raw_row) == 0:
+#         st.error("Raw data not found!")
+#         return
+#
+#     st.write("### Raw Sensor Values (before scaling):")
+#     sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
+#     raw_data = {}
+#     for col in sensor_cols:
+#         if col in raw_row.columns:
+#             raw_data[col] = raw_row[col].values[0]
+#
+#     raw_df = pd.DataFrame(list(raw_data.items()), columns=['Sensor', 'Raw Value'])
+#     st.dataframe(raw_df, hide_index=True, use_container_width=True)
+#
+#     st.write("### Scaled Sensor Values (after scaling):")
+#     scaled_data = {}
+#     for col in sensor_cols:
+#         if col in current_row.columns:
+#             scaled_data[col] = current_row[col].values[0]
+#
+#     scaled_df = pd.DataFrame(list(scaled_data.items()), columns=['Sensor', 'Scaled Value'])
+#     st.dataframe(scaled_df, hide_index=True, use_container_width=True)
+#
+#     if 'regime' in current_row.columns:
+#         st.write(f"**Regime:** {current_row['regime'].values[0]}")
+#
+#     scaler_dict = artifacts[dataset]['scaler_dict']
+#     st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
+#
+#     notebook_values = {
+#         'sensor_1': 0.0,
+#         'sensor_2': -0.02085,
+#         'sensor_3': 0.125843,
+#         'sensor_4': -0.101434,
+#         'sensor_5': 0.0,
+#         'sensor_6': -0.17469,
+#         'sensor_7': 1.840167,
+#     }
+#
+#     st.write("### Comparison with Notebook:")
+#     comparison = []
+#     for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
+#         if col in current_row.columns and col in notebook_values:
+#             app_val = current_row[col].values[0]
+#             nb_val = notebook_values[col]
+#             comparison.append({
+#                 'Sensor': col,
+#                 'Notebook': nb_val,
+#                 'App': app_val,
+#                 'Diff': abs(app_val - nb_val),
+#                 'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
+#             })
+#
+#     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+#
+# def main():
+#     initialize_session_state()
+#
+#     st.title("Jet Engine Early Warning System")
+#     st.caption("Predictive Maintenance Dashboard for NASA C-MAPSS Turbofan Engines")
+#
+#     with st.spinner("Loading model artifacts..."):
+#         artifacts = load_artifacts()
+#
+#     with st.sidebar:
+#         st.header("Engine Configuration")
+#
+#         available_datasets = ['FD001', 'FD002']
+#         selected_dataset = st.selectbox(
+#             "Select Dataset",
+#             available_datasets,
+#             format_func=lambda x: f"{x} - {get_dataset_description(x)}"
+#         )
+#
+#         with st.spinner(f"Loading {selected_dataset} data..."):
+#             test_df, rul_df = load_raw_data(selected_dataset)
+#
+#         engines = sorted(test_df['engine_id'].unique())
+#         selected_engine = st.selectbox(
+#             "Select Engine ID",
+#             engines,
+#             format_func=lambda x: f"Engine #{x}"
+#         )
+#
+#         with st.spinner(f"Processing engine {selected_engine} data..."):
+#             processed_df = preprocess_engine_data(
+#                 selected_dataset, selected_engine, test_df, rul_df, artifacts
+#             )
+#
+#         if len(processed_df) == 0:
+#             st.error(f"No data found for engine {selected_engine}")
+#             return
+#
+#         cycles = sorted(processed_df['cycle'].unique())
+#         selected_cycle = st.slider(
+#             "Select Cycle",
+#             min_value=min(cycles),
+#             max_value=max(cycles),
+#             value=max(cycles),
+#             step=1
+#         )
+#
+#         predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
+#
+#     if predict_button:
+#         st.session_state.prediction_done = True
+#
+#         features = get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts)
+#
+#         if features is None:
+#             st.error("Could not extract features for prediction")
+#             return
+#
+#         with st.spinner("Making predictions..."):
+#             rul_pred, rul_lower, rul_upper = predict_rul(features, selected_dataset, artifacts)
+#             risks = predict_failure_risk(features, selected_dataset, artifacts)
+#             anomaly_scores = predict_anomaly(features, selected_dataset, artifacts)
+#             recommendation = make_recommendation(
+#                 rul_pred, rul_lower, rul_upper,
+#                 risks, anomaly_scores, selected_dataset, artifacts
+#             )
+#
+#             st.session_state.rul_pred = rul_pred
+#             st.session_state.rul_lower = rul_lower
+#             st.session_state.rul_upper = rul_upper
+#             st.session_state.risks = risks
+#             st.session_state.anomaly_scores = anomaly_scores
+#             st.session_state.recommendation = recommendation
+#             st.session_state.processed_df = processed_df
+#             st.session_state.selected_cycle = selected_cycle
+#             st.session_state.selected_dataset = selected_dataset
+#             st.session_state.artifacts = artifacts
+#
+#     if st.session_state.prediction_done and st.session_state.rul_pred is not None:
+#         rul_pred = st.session_state.rul_pred
+#         rul_lower = st.session_state.rul_lower
+#         rul_upper = st.session_state.rul_upper
+#         risks = st.session_state.risks
+#         anomaly_scores = st.session_state.anomaly_scores
+#         recommendation = st.session_state.recommendation
+#         processed_df = st.session_state.processed_df
+#         selected_cycle = st.session_state.selected_cycle
+#         selected_dataset = st.session_state.selected_dataset
+#         artifacts = st.session_state.artifacts
+#
+#         st.subheader("Current Engine Status")
+#
+#         col1, col2, col3, col4 = st.columns(4)
+#
+#         with col1:
+#             st.metric(
+#                 "Remaining Useful Life",
+#                 f"{rul_pred:.0f} cycles",
+#                 delta=f"95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]"
+#             )
+#
+#         with col2:
+#             prob_h30 = risks['h30']['probability']
+#             st.metric(
+#                 "Failure Risk (30 cycles)",
+#                 f"{prob_h30:.1%}",
+#                 delta=f"Threshold: {risks['h30']['threshold']:.2f}"
+#             )
+#
+#         with col3:
+#             anomaly_score = anomaly_scores['OCSVM']['percentile']
+#             st.metric(
+#                 "Anomaly Score",
+#                 f"{anomaly_score:.1f}th percentile",
+#                 delta="Critical > 95%"
+#             )
+#
+#         with col4:
+#             color = recommendation['color']
+#             st.markdown(f"""
+#             <div style="padding: 15px; border-radius: 10px; background-color: {color}; text-align: center;">
+#                 <h2 style="color: white; margin: 0; font-size: 24px;">{recommendation['action']}</h2>
+#                 <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">Confidence: {recommendation['confidence']}</p>
+#             </div>
+#             """, unsafe_allow_html=True)
+#
+#         st.subheader("Failure Risk by Horizon")
+#
+#         col1, col2, col3 = st.columns(3)
+#         for i, h in enumerate([10, 20, 30]):
+#             with [col1, col2, col3][i]:
+#                 prob = risks[f'h{h}']['probability']
+#                 alert = risks[f'h{h}']['alert']
+#                 st.metric(
+#                     f"Risk in {h} cycles",
+#                     f"{prob:.1%}",
+#                     delta="ALERT" if alert else "Normal"
+#                 )
+#
+#         st.subheader("Anomaly Detection Results")
+#
+#         anomaly_data = []
+#         for name, scores in anomaly_scores.items():
+#             anomaly_data.append({
+#                 'Method': name,
+#                 'Score': f"{scores['percentile']:.1f}th percentile",
+#                 'Status': 'ALERT' if scores['alert'] else 'Normal'
+#             })
+#         st.dataframe(pd.DataFrame(anomaly_data), hide_index=True, use_container_width=True)
+#
+#         st.subheader("Decision Triggers")
+#
+#         triggers = recommendation['triggers']
+#         if len(triggers) > 1:
+#             st.warning("Active triggers:")
+#             for trigger in triggers:
+#                 st.write(f"- {trigger}")
+#         else:
+#             st.success(triggers[0])
+#
+#         st.subheader("Engine Health Timeline")
+#
+#         dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
+#
+#         sensor_cols = [col for col in processed_df.columns if col.endswith('_raw') and 'sensor_' in col]
+#         sensor_cols = [col for col in sensor_cols if col.replace('_raw', '') not in dropped_sensors]
+#
+#         col1, col2 = st.columns([2, 1])
+#         with col1:
+#             selected_sensor = st.selectbox(
+#                 "Select Sensor to Visualize",
+#                 sensor_cols if sensor_cols else ['sensor_2_raw'],
+#                 format_func=lambda x: x.replace('_raw', '')
+#             )
+#         with col2:
+#             show_health = st.checkbox("Show Health Features", value=False)
+#
+#         if show_health:
+#             fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
+#                                 vertical_spacing=0.15)
+#
+#             fig.add_trace(
+#                 go.Scatter(x=processed_df['cycle'], y=processed_df['RUL'], mode='lines', name='True RUL',
+#                            line=dict(color='green', width=2)),
+#                 row=1, col=1
+#             )
+#             fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
+#
+#             anomaly_col = 'OCSVM_Anomaly_Score'
+#             if anomaly_col in processed_df.columns:
+#                 fig.add_trace(
+#                     go.Scatter(x=processed_df['cycle'], y=processed_df[anomaly_col], mode='lines',
+#                                name='Anomaly Score',
+#                                line=dict(color='orange', width=2)),
+#                     row=2, col=1
+#                 )
+#                 fig.add_hline(y=95, line_dash="dash", line_color="red", annotation_text="Critical", row=2, col=1)
+#                 fig.add_hline(y=90, line_dash="dot", line_color="orange", annotation_text="Warning", row=2, col=1)
+#
+#             fig.update_layout(height=500, showlegend=True)
+#
+#         else:
+#             fig = go.Figure()
+#
+#             fig.add_trace(
+#                 go.Scatter(x=processed_df['cycle'], y=processed_df[selected_sensor], mode='lines',
+#                            name=selected_sensor.replace('_raw', ''),
+#                            line=dict(color='blue', width=2))
+#             )
+#
+#             fig.add_trace(
+#                 go.Scatter(x=processed_df['cycle'], y=processed_df['RUL'], mode='lines', name='RUL',
+#                            line=dict(color='green', width=2, dash='dot'), yaxis='y2')
+#             )
+#
+#             fig.update_layout(
+#                 yaxis=dict(title=selected_sensor.replace('_raw', '')),
+#                 yaxis2=dict(title='RUL', overlaying='y', side='right'),
+#                 height=400,
+#                 showlegend=True
+#             )
+#
+#         fig.add_vline(x=selected_cycle, line_dash="dash", line_color="red", annotation_text="Current Cycle",
+#                       annotation_position="top")
+#         st.plotly_chart(fig, use_container_width=True)
+#
+#         with st.expander("Model Metadata"):
+#             metadata = artifacts[selected_dataset]['metadata']
+#             rul_params = artifacts[selected_dataset]['rul_params']
+#             col1, col2 = st.columns(2)
+#             with col1:
+#                 st.write("**Dataset Information**")
+#                 st.write(f"- Dataset: {metadata.get('dataset', 'N/A')}")
+#                 st.write(f"- Description: {metadata.get('description', 'N/A')}")
+#                 st.write(f"- Training Date: {metadata.get('training_date', 'N/A')}")
+#                 st.write(f"- Author: {metadata.get('author', 'N/A')}")
+#             with col2:
+#                 st.write("**Model Configuration**")
+#                 st.write(f"- Model Version: {metadata.get('model_version', 'N/A')}")
+#                 window_sizes = metadata.get('window_sizes', [])
+#                 if isinstance(window_sizes, list):
+#                     st.write(f"- Window Sizes: {', '.join(map(str, window_sizes))} cycles")
+#                 else:
+#                     st.write(f"- Window Size: {window_sizes} cycles")
+#                 st.write(f"- RUL Cap: {rul_params.get('rul_cap', 125)} cycles")
+#                 st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
+#                 if selected_dataset == 'FD002':
+#                     st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
+#
+#     # بعد از پردازش داده‌ها و قبل از predict_button
+#     # در بخش main، بعد از processed_df
+#     # در بخش Debug Tools
+#     with st.expander("🔧 Debug Tools"):
+#         col1, col2 = st.columns(2)
+#         with col1:
+#             debug_engine = st.number_input(
+#                 "Debug Engine ID",
+#                 value=68,
+#                 step=1,
+#                 key="debug_engine_input"  # ← کلید یکتا
+#             )
+#         with col2:
+#             debug_cycle = st.number_input(
+#                 "Debug Cycle",
+#                 value=150,
+#                 step=1,
+#                 key="debug_cycle_input"  # ← کلید یکتا
+#             )
+#
+#         if st.button("Run Step-by-Step Debug", key="debug_step_btn"):
+#             debug_preprocessing_steps(selected_dataset, debug_engine, debug_cycle, artifacts)
+#
+#         if st.button("Run Scaling Debug", key="debug_scaling_btn"):
+#             debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+#
+#         if st.button("Run Feature Comparison", key="debug_feature_btn"):
+#             debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
+#
+#
+# if __name__ == "__main__":
+#     main()
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -710,79 +2263,10 @@ def load_artifacts():
 
 @st.cache_data
 def load_raw_data(dataset):
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
-                                                                                     range(1, 22)]
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in range(1, 22)]
     test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
     rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
     return test_df, rul_df
-
-
-# def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
-#     window_sizes = window_info['window_sizes']
-#     df_out = engine_df.copy()
-#
-#     if len(df_out) == 0:
-#         return df_out
-#
-#     grouped = df_out.groupby('engine_id')
-#
-#     for W in window_sizes:
-#         for col in feature_cols:
-#             if col not in df_out.columns:
-#                 continue
-#
-#             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
-#
-#             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
-#             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
-#             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
-#             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
-#
-#             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
-#                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
-#                 raw=True
-#             )
-#             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
-#
-#     return df_out
-
-
-# def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
-#     window_sizes = window_info['window_sizes']
-#     df_out = engine_df.copy()
-#
-#     if len(df_out) == 0:
-#         return df_out
-#
-#     grouped = df_out.groupby('engine_id')
-#
-#     for W in window_sizes:
-#         for col in feature_cols:
-#             if col not in df_out.columns:
-#                 continue
-#
-#             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
-#
-#             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
-#             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
-#             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
-#             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
-#
-#             # ========== اضافه کردن EWMA و DIFF ==========
-#             df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
-#                 lambda x: x.ewm(span=W, adjust=False).mean()
-#             ).reset_index(level=0, drop=True)
-#
-#             df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
-#             # ============================================
-#
-#             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
-#                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
-#                 raw=True
-#             )
-#             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
-#
-#     return df_out
 
 
 def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
@@ -814,144 +2298,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
 
     return df_out
 
-# def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#
-#     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
-#
-#     if len(engine_df) == 0:
-#         return pd.DataFrame()
-#
-#     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
-#     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
-#
-#     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
-#     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
-#     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
-#
-#     rul_cap = ds_artifacts['rul_params']['rul_cap']
-#     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
-#
-#     engine_df_raw = engine_df.copy()
-#
-#     feature_info = ds_artifacts['feature_info']
-#     features_to_scale = feature_info['all_features']
-#     scaler = ds_artifacts['scaler']
-#
-#     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
-#     if dropped_sensors:
-#         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
-#         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
-#
-#     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
-#
-#     if dataset == 'FD001':
-#         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
-#     else:
-#         op_settings = feature_info['op_settings']
-#         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
-#
-#         scaler_dict = ds_artifacts['scaler_dict']
-#         kmeans = ds_artifacts['kmeans']
-#
-#         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
-#
-#         for col in sensor_cols:
-#             engine_df[col] = engine_df[col].astype(float)
-#
-#         for r in range(6):
-#             regime_mask = engine_df['regime'] == r
-#             if regime_mask.sum() > 0 and r in scaler_dict:
-#                 engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
-#                     engine_df.loc[regime_mask, sensor_cols])
-#
-#     window_info = ds_artifacts['window_info']
-#     feature_cols = window_info['feature_cols']
-#     active_cols = [col for col in feature_cols if col in engine_df.columns]
-#     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
-#
-#     for col in sensor_cols:
-#         if col in engine_df_raw.columns:
-#             engine_df[col + '_raw'] = engine_df_raw[col]
-#
-#     return engine_df
-# def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
-#     # ==========================================
-#     # DEBUG: VERSION CHECK
-#     # ==========================================
-#     st.write("### 🔍 DEBUG: preprocess_engine_data version")
-#     st.write("Version: 2.0 - WITH natural sorting (key=lambda x: int(x.split('_')[1]))")
-#     # ==========================================
-#     ds_artifacts = artifacts[dataset]
-#
-#     engine_df = test_df[test_df['engine_id'] == engine_id].copy()
-#
-#     if len(engine_df) == 0:
-#         return pd.DataFrame()
-#
-#     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
-#     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
-#
-#     engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
-#     engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
-#     engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
-#
-#     rul_cap = ds_artifacts['rul_params']['rul_cap']
-#     engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
-#
-#     engine_df_raw = engine_df.copy()
-#
-#     feature_info = ds_artifacts['feature_info']
-#     features_to_scale = feature_info['all_features']
-#     scaler = ds_artifacts['scaler']
-#
-#     dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
-#     if dropped_sensors:
-#         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
-#         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
-#
-#     sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
-#     # ==========================================
-#     # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
-#     # ==========================================
-#     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
-#     st.write("### 🔍 DEBUG: sensor_cols after natural sort")
-#     st.write(f"sensor_cols: {sensor_cols[:10]}...")
-#     # ==========================================
-#
-#     if dataset == 'FD001':
-#         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
-#     else:
-#         op_settings = feature_info['op_settings']
-#         engine_df[op_settings] = scaler.transform(engine_df[op_settings])
-#
-#         scaler_dict = ds_artifacts['scaler_dict']
-#         kmeans = ds_artifacts['kmeans']
-#
-#         engine_df['regime'] = kmeans.predict(engine_df[op_settings])
-#
-#         for col in sensor_cols:
-#             engine_df[col] = engine_df[col].astype(float)
-#
-#         for r in range(6):
-#             regime_mask = engine_df['regime'] == r
-#             if regime_mask.sum() > 0 and r in scaler_dict:
-#                 try:
-#                     engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
-#                         engine_df.loc[regime_mask, sensor_cols])
-#                 except Exception as e:
-#                     pass
-#
-#     window_info = ds_artifacts['window_info']
-#     feature_cols = window_info['feature_cols']
-#     active_cols = [col for col in feature_cols if col in engine_df.columns]
-#     engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
-#
-#     for col in sensor_cols:
-#         if col in engine_df_raw.columns:
-#             engine_df[col + '_raw'] = engine_df_raw[col]
-#
-#     return engine_df
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
@@ -982,13 +2328,9 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
         engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
         engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
-    # ==========================================
-    # ✅ استفاده از active_sensors (فقط سنسورهای غیر flatline)
-    # ==========================================
     active_sensors = feature_info['active_sensors']
     sensor_cols = [col for col in active_sensors if col in engine_df.columns]
     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
-    # ==========================================
 
     if dataset == 'FD001':
         engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
@@ -1048,90 +2390,6 @@ def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, 
     return np.array(features)
 
 
-# def predict_rul(features, dataset, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#     model = ds_artifacts['xgb_model']
-#     conformal_params = ds_artifacts['conformal_params']
-#
-#     feature_names = ds_artifacts['feature_names']
-#     expected_features = feature_names['all_features']
-#
-#     if len(features) != len(expected_features):
-#         if len(features) < len(expected_features):
-#             padded = np.zeros(len(expected_features))
-#             padded[:len(features)] = features
-#             features = padded
-#         else:
-#             features = features[:len(expected_features)]
-#
-#     pred = model.predict(features.reshape(1, -1))[0]
-#     rul_cap = ds_artifacts['rul_params']['rul_cap']
-#     pred_capped = np.clip(pred, None, rul_cap)
-#
-#     if pred_capped <= 50:
-#         q = conformal_params['q_95_near_failure']
-#     elif pred_capped <= 100:
-#         q = conformal_params['q_95_mid_life']
-#     else:
-#         q = conformal_params['q_95_early_life']
-#
-#     lower = max(0, pred_capped - q)
-#     upper = pred_capped + q
-#
-#     return pred_capped, lower, upper
-
-# def predict_rul(features, dataset, artifacts):
-#     ds_artifacts = artifacts[dataset]
-#     model = ds_artifacts['xgb_model']
-#     conformal_params = ds_artifacts['conformal_params']
-#
-#     feature_names = ds_artifacts['feature_names']
-#     expected_features = feature_names['all_features']
-#
-#     # ========== DEBUG ==========
-#     st.write("### DEBUG: predict_rul")
-#     st.write(f"Dataset: {dataset}")
-#     st.write(f"Features length: {len(features)}")
-#     st.write(f"Expected features length: {len(expected_features)}")
-#
-#     if len(features) != len(expected_features):
-#         st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
-#         if len(features) < len(expected_features):
-#             padded = np.zeros(len(expected_features))
-#             padded[:len(features)] = features
-#             features = padded
-#             st.write(f"  Padded to {len(features)}")
-#         else:
-#             features = features[:len(expected_features)]
-#             st.write(f"  Truncated to {len(expected_features)}")
-#
-#     # نمایش چند ویژگی اول برای بررسی
-#     st.write(f"First 5 features: {features[:5]}")
-#     st.write(f"Feature names (first 5): {expected_features[:5]}")
-#     # ===========================
-#
-#     pred = model.predict(features.reshape(1, -1))[0]
-#     rul_cap = ds_artifacts['rul_params']['rul_cap']
-#     pred_capped = np.clip(pred, None, rul_cap)
-#
-#     st.write(f"Raw prediction: {pred:.2f}")
-#     st.write(f"Capped prediction: {pred_capped:.2f}")
-#
-#     if pred_capped <= 50:
-#         q = conformal_params['q_95_near_failure']
-#     elif pred_capped <= 100:
-#         q = conformal_params['q_95_mid_life']
-#     else:
-#         q = conformal_params['q_95_early_life']
-#
-#     lower = max(0, pred_capped - q)
-#     upper = pred_capped + q
-#
-#     st.write(f"q_95: {q:.2f}")
-#     st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
-#
-#     return pred_capped, lower, upper
-
 def predict_rul(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     model = ds_artifacts['xgb_model']
@@ -1140,64 +2398,30 @@ def predict_rul(features, dataset, artifacts):
     feature_names = ds_artifacts['feature_names']
     expected_features = feature_names['all_features']
 
-    # ============================================================
-    # 📋 DEBUG: Prediction Pipeline (Step-by-Step)
-    # ============================================================
-    st.write("=" * 60)
-    st.write("🔍 PREDICTION PIPELINE DEBUG (APP)")
-    st.write("=" * 60)
-
-    st.write(f"📌 Dataset          : {dataset}")
-    st.write(f"📌 Features length  : {len(features)}")
-    st.write(f"📌 Expected features: {len(expected_features)}")
-
     if len(features) != len(expected_features):
-        st.write(f"⚠️ Feature mismatch! Adjusting...")
         if len(features) < len(expected_features):
-            features = np.pad(features, (0, len(expected_features) - len(features)))
-            st.write(f"   → Padded to {len(features)}")
+            padded = np.zeros(len(expected_features))
+            padded[:len(features)] = features
+            features = padded
         else:
             features = features[:len(expected_features)]
-            st.write(f"   → Truncated to {len(expected_features)}")
 
-    st.write("\n--- First 10 Features (App) ---")
-    for i in range(10):
-        st.write(f"  {i:2d}. {expected_features[i]:<20} = {features[i]:.6f}")
-
-    # ============================================================
-    # 🧠 Model Prediction
-    # ============================================================
-    st.write("\n🧠 Running XGBoost model...")
     pred = model.predict(features.reshape(1, -1))[0]
     rul_cap = ds_artifacts['rul_params']['rul_cap']
     pred_capped = np.clip(pred, None, rul_cap)
 
-    st.write(f"  Raw prediction   : {pred:.2f}")
-    st.write(f"  Capped prediction: {pred_capped:.2f} (cap={rul_cap})")
-
-    # ============================================================
-    # 📐 Conformal Prediction (Uncertainty)
-    # ============================================================
-    st.write("\n📐 Conformal Prediction (q_95):")
     if pred_capped <= 50:
         q = conformal_params['q_95_near_failure']
-        region = "Near-failure (RUL≤50)"
     elif pred_capped <= 100:
         q = conformal_params['q_95_mid_life']
-        region = "Mid-life (50<RUL≤100)"
     else:
         q = conformal_params['q_95_early_life']
-        region = "Early-life (RUL>100)"
 
     lower = max(0, pred_capped - q)
     upper = pred_capped + q
 
-    st.write(f"  Region        : {region}")
-    st.write(f"  q_95          : {q:.2f}")
-    st.write(f"  Confidence Int: [{lower:.2f}, {upper:.2f}]")
-    st.write("=" * 60)
-
     return pred_capped, lower, upper
+
 
 def predict_failure_risk(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
@@ -1216,34 +2440,17 @@ def predict_failure_risk(features, dataset, artifacts):
         else:
             features = features[:len(expected_features)]
 
-    # ========== DEBUG: predict_failure_risk ==========
-    st.write("### DEBUG: predict_failure_risk")
-    st.write(f"Dataset: {dataset}")
-    st.write(f"tuned_thresholds type: {type(tuned_thresholds)}")
-    if tuned_thresholds is not None:
-        st.write(f"tuned_thresholds keys: {list(tuned_thresholds.keys())}")
-        for key in list(tuned_thresholds.keys())[:5]:
-            st.write(f"  {key}: {tuned_thresholds[key]}")
-    else:
-        st.write("tuned_thresholds is None")
-    st.write("---")
-
     risks = {}
     for h in horizons:
         model = calibrated_models[h]['XGBoost']
         prob = model.predict_proba(features.reshape(1, -1))[0, 1]
 
-        st.write(f"Horizon {h}: prob = {prob:.4f}")
-
         if str(h) in tuned_thresholds:
             threshold = tuned_thresholds[str(h)]['XGBoost']
-            st.write(f"  Found in str({h}): {threshold}")
         elif h in tuned_thresholds:
             threshold = tuned_thresholds[h]['XGBoost']
-            st.write(f"  Found in {h}: {threshold}")
         else:
             threshold = 0.05
-            st.write(f"  NOT found, using default: {threshold}")
 
         risks[f'h{h}'] = {
             'probability': prob,
@@ -1251,7 +2458,6 @@ def predict_failure_risk(features, dataset, artifacts):
             'alert': prob >= threshold
         }
 
-    st.write("---")
     return risks
 
 
@@ -1271,22 +2477,6 @@ def predict_anomaly(features, dataset, artifacts):
         else:
             features = features[:len(expected_features)]
 
-    # ========== DEBUG: predict_anomaly ==========
-    st.write("### DEBUG: predict_anomaly")
-    st.write(f"Dataset: {dataset}")
-    st.write(f"anomaly_models keys: {list(anomaly_models.keys())}")
-    st.write(f"pct_scores_test type: {type(pct_scores_test)}")
-    if pct_scores_test is not None:
-        st.write(f"pct_scores_test keys: {list(pct_scores_test.keys())}")
-        for key in pct_scores_test.keys():
-            if pct_scores_test[key] is not None:
-                st.write(f"  {key}: length={len(pct_scores_test[key])}, min={np.min(pct_scores_test[key]):.3f}, max={np.max(pct_scores_test[key]):.3f}")
-            else:
-                st.write(f"  {key}: None")
-    else:
-        st.write("pct_scores_test is None")
-    st.write("---")
-
     scores = {}
     for name, model in anomaly_models.items():
         try:
@@ -1297,9 +2487,7 @@ def predict_anomaly(features, dataset, artifacts):
             else:
                 raw_score = -model.decision_function(features.reshape(1, -1))[0]
 
-            st.write(f"Model {name}: raw_score = {raw_score:.4f}")
-
-            if pct_scores_test is not None and name in pct_scores_test:
+            if name in pct_scores_test:
                 ref_scores = pct_scores_test[name]
                 if ref_scores is not None and len(ref_scores) > 0:
                     if raw_score >= np.max(ref_scores):
@@ -1308,29 +2496,25 @@ def predict_anomaly(features, dataset, artifacts):
                         percentile = 0.0
                     else:
                         percentile = float(np.interp(raw_score, np.sort(ref_scores), np.linspace(0, 100, len(ref_scores))))
-                    st.write(f"  percentile = {percentile:.2f} (from {len(ref_scores)} ref_scores)")
                 else:
                     percentile = 50.0
-                    st.write(f"  ref_scores is empty, using default: {percentile}")
             else:
                 percentile = 50.0
-                st.write(f"  pct_scores_test[{name}] not found, using default: {percentile}")
 
             scores[name] = {
                 'raw_score': float(raw_score),
                 'percentile': float(percentile),
                 'alert': percentile >= 95
             }
-        except Exception as e:
-            st.write(f"  ERROR in {name}: {str(e)}")
+        except Exception:
             scores[name] = {
                 'raw_score': 0.0,
                 'percentile': 50.0,
                 'alert': False
             }
 
-    st.write("---")
     return scores
+
 
 def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
     prob_h30 = failure_risks['h30']['probability']
@@ -1365,11 +2549,9 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
 
         triggers = []
         if rul_pred <= final_thresholds['rul_inspect']:
-            triggers.append(
-                f"RUL prediction ({rul_pred:.0f}) below INSPECT threshold ({final_thresholds['rul_inspect']})")
+            triggers.append(f"RUL prediction ({rul_pred:.0f}) below INSPECT threshold ({final_thresholds['rul_inspect']})")
         if rul_lower <= final_thresholds['rul_inspect_lower']:
-            triggers.append(
-                f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({final_thresholds['rul_inspect_lower']})")
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({final_thresholds['rul_inspect_lower']})")
         if (prob_h30 > final_thresholds['prob_inspect']) and (anomaly_score > final_thresholds['anomaly_inspect']):
             triggers.append(f"Failure probability ({prob_h30:.1%}) and Anomaly ({anomaly_score:.1f}) above thresholds")
 
@@ -1383,8 +2565,7 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
     elif (prob_h30 > final_thresholds['monitor_prob']) or (anomaly_score > 85):
         triggers = []
         if prob_h30 > final_thresholds['monitor_prob']:
-            triggers.append(
-                f"Failure probability ({prob_h30:.1%}) above monitor threshold ({final_thresholds['monitor_prob']:.0%})")
+            triggers.append(f"Failure probability ({prob_h30:.1%}) above monitor threshold ({final_thresholds['monitor_prob']:.0%})")
         if anomaly_score > 85:
             triggers.append(f"Anomaly score ({anomaly_score:.1f}) above warning threshold (85)")
 
@@ -1436,488 +2617,6 @@ def initialize_session_state():
     if 'artifacts' not in st.session_state:
         st.session_state.artifacts = None
 
-
-def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
-
-    # ==========================================
-    # 🔍 بررسی window_info
-    # ==========================================
-    st.write("### 🔍 Window Info Check")
-    window_info = artifacts[dataset]['window_info']
-    st.write(f"Window sizes: {window_info['window_sizes']}")
-    st.write(f"Feature cols: {len(window_info['feature_cols'])}")
-    st.write(f"Op settings: {window_info['op_settings']}")
-    """مقایسه مستقیم ویژگی‌های یک موتور خاص با نوت‌بوک"""
-
-    st.write(f"### 🔍 Debug: Engine {engine_id}, Cycle {cycle}")
-
-    current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
-
-    if len(current_row) == 0:
-        st.error(f"Engine {engine_id}, Cycle {cycle} not found!")
-        return
-
-    # ==========================================
-    # 🔍 بررسی regime
-    # ==========================================
-    if 'regime' in current_row.columns:
-        regime = current_row['regime'].values[0]
-        st.write(f"**Regime:** {regime}")
-    else:
-        st.write("**Regime:** Not found in processed_df")
-
-    # ==========================================
-    # 🔍 بررسی scaler_dict و مقایسه کامل سنسورها
-    # ==========================================
-    st.write("### 🔍 Full Comparison: All Sensors")
-
-    test_df, rul_df = load_raw_data(dataset)
-    raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
-
-    if len(raw_row) == 0:
-        st.error("Raw data not found!")
-        return
-
-    scaler_dict = artifacts[dataset]['scaler_dict']
-    if regime in scaler_dict:
-        scaler = scaler_dict[regime]
-        sensor_cols = sorted([col for col in raw_row.columns if col.startswith('sensor_')],
-                             key=lambda x: int(x.split('_')[1]))
-        raw_values = raw_row[sensor_cols].values.reshape(1, -1)
-        raw_values = np.nan_to_num(raw_values, nan=0.0, posinf=0.0, neginf=0.0)
-        scaled_manual = scaler.transform(raw_values)[0]
-
-        comparison_data = []
-        for i, col in enumerate(sensor_cols):
-            if col in current_row.columns:
-                manual_val = float(scaled_manual[i])
-                app_val = float(current_row[col].values[0])
-                diff = abs(app_val - manual_val)
-                comparison_data.append({
-                    'Sensor': col,
-                    'Manual Scaled': manual_val,
-                    'App Scaled': app_val,
-                    'Diff': diff,
-                    'Match': '✅' if diff < 0.001 else '❌'
-                })
-
-        st.dataframe(pd.DataFrame(comparison_data), hide_index=True, use_container_width=True)
-
-        mismatched = [row for row in comparison_data if row['Match'] == '❌']
-        if mismatched:
-            st.warning(f"⚠️ {len(mismatched)} sensors have mismatched values!")
-        else:
-            st.success("✅ All sensors match!")
-    else:
-        st.error(f"Regime {regime} not in scaler_dict!")
-
-    # ==========================================
-    # 🔍 بررسی feature_names
-    # ==========================================
-    st.write("### 🔍 Checking feature_names")
-    feature_names = artifacts[dataset]['feature_names']
-    all_features = feature_names['all_features']
-    st.write(f"Total features in feature_names: {len(all_features)}")
-    st.write(f"First 20 features: {all_features[:20]}")
-
-    missing_in_processed = [col for col in all_features if col not in processed_df.columns]
-    if missing_in_processed:
-        st.warning(f"⚠️ Missing {len(missing_in_processed)} features in processed_df: {missing_in_processed[:10]}...")
-    else:
-        st.success("✅ All features exist in processed_df")
-
-    expected_features = all_features
-
-    st.write(f"**Expected features count:** {len(expected_features)}")
-
-    # استخراج ویژگی‌ها
-    features = []
-    missing = []
-    for col in expected_features:
-        if col in current_row.columns:
-            val = current_row[col].values[0]
-            if pd.isna(val):
-                val = 0.0
-            features.append(float(val))
-        else:
-            features.append(0.0)
-            missing.append(col)
-
-    st.write(f"**Extracted features count:** {len(features)}")
-
-    if missing:
-        st.warning(f"⚠️ Missing {len(missing)} features: {missing[:5]}...")
-
-    # نمایش 10 ویژگی اول
-    st.write("### First 10 features (App):")
-    for i, col in enumerate(expected_features[:10]):
-        st.write(f"  {i}: {col} = {features[i]:.6f}")
-
-    # مقایسه با مقادیر نوت‌بوک (Hardcoded از خروجی نوت‌بوک)
-    notebook_values = {
-        'op_setting_1': 0.747954,
-        'op_setting_2': 0.865002,
-        'op_setting_3': 0.417670,
-        'sensor_1': 0.000000,
-        'sensor_2': -0.020850,
-        'sensor_3': 0.125843,
-        'sensor_4': -0.101434,
-        'sensor_5': -0.000000,
-        'sensor_6': -0.174690,
-        'sensor_7': 1.840167,
-    }
-
-    st.write("### Comparison with Notebook (first 10):")
-    comparison = []
-    for i, col in enumerate(expected_features[:10]):
-        if col in notebook_values:
-            app_val = features[i]
-            nb_val = notebook_values[col]
-            diff = abs(app_val - nb_val)
-            comparison.append({
-                'Feature': col,
-                'Notebook': nb_val,
-                'App': app_val,
-                'Diff': diff,
-                'Match': '✅' if diff < 0.001 else '❌'
-            })
-
-    st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
-
-    st.write("### 🔍 Window Feature Types")
-
-    window_cols = [col for col in current_row.columns if any(x in col for x in
-                                                             ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
-                                                              '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
-
-    # شمارش هر نوع
-    types = {
-        '_roll_mean_W': 0,
-        '_roll_std_W': 0,
-        '_roll_min_W': 0,
-        '_roll_max_W': 0,
-        '_ewma_W': 0,
-        '_diff_W': 0,
-        '_slope_W': 0
-    }
-
-    for col in window_cols:
-        for key in types:
-            if key in col:
-                types[key] += 1
-                break
-
-    st.write("Feature type counts:")
-    for key, count in types.items():
-        st.write(f"  {key}: {count}")
-
-    total = sum(types.values())
-    st.write(f"Total: {total}")
-
-    if total != 525:
-        st.warning(f"⚠️ Expected 525, got {total}")
-
-    # ==========================================
-    # 🔍 بررسی مدل XGBoost
-    # ==========================================
-    st.write("### 🔍 XGBoost Model Check")
-
-    model = artifacts[dataset]['xgb_model']
-    st.write(f"Model type: {type(model)}")
-
-    # بررسی پارامترهای مدل
-    if hasattr(model, 'get_params'):
-        params = model.get_params()
-        st.write(f"Model parameters:")
-        st.write(f"  n_estimators: {params.get('n_estimators', 'N/A')}")
-        st.write(f"  max_depth: {params.get('max_depth', 'N/A')}")
-        st.write(f"  learning_rate: {params.get('learning_rate', 'N/A')}")
-
-    # بررسی تعداد ویژگی‌های مورد انتظار مدل
-    if hasattr(model, 'n_features_in_'):
-        st.write(f"Model expected features: {model.n_features_in_}")
-    else:
-        st.write("Model does not have n_features_in_ attribute")
-
-    # پیش‌بینی با مدل
-    features_array = np.array(features).reshape(1, -1)
-    pred = model.predict(features_array)[0]
-    st.write(f"**App RUL Prediction:** {pred:.2f}")
-
-    # ==========================================
-    # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
-    # ==========================================
-
-    st.write("### 🔍 Window Features Check")
-
-    window_cols = [col for col in current_row.columns if any(x in col for x in
-                                                             ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
-                                                              '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
-    st.write(f"Total window features: {len(window_cols)}")
-
-    # ==========================================
-    # 🔍 بررسی خروجی get_features_for_prediction
-    # ==========================================
-    st.write("### 🔍 Testing get_features_for_prediction")
-
-    features = get_features_for_prediction(processed_df, cycle, dataset, artifacts)
-    st.write(f"Features length: {len(features)}")
-    st.write(f"First 10 features: {features[:10]}")
-
-    # مقایسه با مقادیر نوت‌بوک
-    notebook_first_10 = [
-        0.747954,  # op_setting_1
-        0.865002,  # op_setting_2
-        0.417670,  # op_setting_3
-        0.000000,  # sensor_1
-        -0.020850,  # sensor_2
-        0.125843,  # sensor_3
-        -0.101434,  # sensor_4
-        -0.000000,  # sensor_5
-        -0.174690,  # sensor_6
-        1.840167  # sensor_7
-    ]
-
-    st.write("### Comparison with Notebook (first 10):")
-    comparison = []
-    for i in range(10):
-        app_val = features[i] if i < len(features) else None
-        nb_val = notebook_first_10[i]
-        if app_val is not None:
-            diff = abs(app_val - nb_val)
-            comparison.append({
-                'Position': i,
-                'Notebook': nb_val,
-                'App': app_val,
-                'Diff': diff,
-                'Match': '✅' if diff < 0.001 else '❌'
-            })
-
-    st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
-
-    # ==========================================
-    # 🔍 بررسی تعداد کل ویژگی‌ها
-    # ==========================================
-    st.write("### 🔍 Feature Count Summary")
-    st.write(f"Total features in expected_features: {len(expected_features)}")
-    st.write(f"Total features in current_row: {len(current_row.columns)}")
-
-    non_feature_cols = ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final', 'regime']
-    actual_feature_cols = [col for col in current_row.columns if
-                           col not in non_feature_cols and not col.endswith('_raw')]
-    st.write(f"Actual feature columns (excluding non-features): {len(actual_feature_cols)}")
-
-    # بررسی تفاوت
-    if len(expected_features) != len(actual_feature_cols):
-        st.warning(f"⚠️ Feature count mismatch: expected {len(expected_features)}, got {len(actual_feature_cols)}")
-        diff_cols = set(expected_features) - set(actual_feature_cols)
-        if diff_cols:
-            st.write(f"Missing in actual: {list(diff_cols)[:10]}...")
-    else:
-        st.success("✅ Feature count matches!")
-
-    # پیش‌بینی RUL
-    features_array = np.array(features).reshape(1, -1)
-    model = artifacts[dataset]['xgb_model']
-    pred = model.predict(features_array)[0]
-    st.write(f"**App RUL Prediction:** {pred:.2f}")
-    st.write(f"**Notebook RUL Prediction:** 113.53")
-    st.write(f"**True RUL (Notebook):** 124")
-
-    return features
-
-def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
-    """بررسی مرحله به مرحله preprocessing"""
-
-    st.write("### 🔍 Detailed Preprocessing Debug")
-
-    test_df, rul_df = load_raw_data(dataset)
-
-    raw_data = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
-    if len(raw_data) == 0:
-        st.error("Raw data not found!")
-        return
-
-    st.write("#### Step 1: Raw Data (First 7 sensors)")
-    raw_sensors = {}
-    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
-        if col in raw_data.columns:
-            raw_sensors[col] = float(raw_data[col].values[0])
-
-    raw_df = pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value'])
-    st.dataframe(raw_df, hide_index=True, use_container_width=True)
-
-    st.write("#### Step 2.5: sensor_cols comparison")
-    sensor_cols_app = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
-    sensor_cols_notebook = [f'sensor_{i}' for i in range(1, 22)]
-
-    st.write(f"sensor_cols_app: {sensor_cols_app}")
-    st.write(f"sensor_cols_notebook: {sensor_cols_notebook}")
-
-    if sensor_cols_app == sensor_cols_notebook:
-        st.write("✅ sensor_cols match!")
-    else:
-        st.write("❌ sensor_cols differ!")
-        st.write(f"Missing in app: {set(sensor_cols_notebook) - set(sensor_cols_app)}")
-        st.write(f"Extra in app: {set(sensor_cols_app) - set(sensor_cols_notebook)}")
-
-    st.write("#### Step 2: Scaler Dict Check")
-    scaler_dict = artifacts[dataset]['scaler_dict']
-    st.write(f"Available scalers: {list(scaler_dict.keys())}")
-
-    st.write("#### Step 3: KMeans Regime Prediction")
-    kmeans = artifacts[dataset]['kmeans']
-    op_settings = ['op_setting_1', 'op_setting_2', 'op_setting_3']
-    regime = kmeans.predict(raw_data[op_settings].values.reshape(1, -1))[0]
-    st.write(f"Predicted Regime: {regime}")
-
-    if regime not in scaler_dict:
-        st.error(f"Regime {regime} not in scaler_dict!")
-        return
-
-    st.write("#### Step 4: Apply scaler_dict")
-    scaler = scaler_dict[regime]
-    sensor_cols = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
-    raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
-    raw_sensor_values = np.nan_to_num(raw_sensor_values, nan=0.0, posinf=0.0, neginf=0.0)
-
-    try:
-        scaled_values = scaler.transform(raw_sensor_values)[0]
-        scaled_dict = {}
-        for i, col in enumerate(sensor_cols):
-            scaled_dict[col] = float(scaled_values[i])
-
-        scaled_df = pd.DataFrame(list(scaled_dict.items()), columns=['Sensor', 'Scaled Value'])
-        st.dataframe(scaled_df, hide_index=True, use_container_width=True)
-    except Exception as e:
-        st.error(f"Scaling error: {e}")
-        return
-
-    st.write("#### Step 5: Comparison with Notebook")
-    notebook_values = {
-        'sensor_1': 0.0,
-        'sensor_2': -0.02085,
-        'sensor_3': 0.125843,
-        'sensor_4': -0.101434,
-        'sensor_6': -0.17469,
-        'sensor_7': 1.840167,
-    }
-
-    comparison = []
-    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
-        if col in scaled_dict and col in notebook_values:
-            app_val = scaled_dict[col]
-            nb_val = notebook_values[col]
-            comparison.append({
-                'Sensor': col,
-                'Notebook': nb_val,
-                'App': app_val,
-                'Diff': abs(app_val - nb_val),
-                'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
-            })
-
-    if comparison:
-        st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
-    else:
-        st.write("No comparison data available")
-
-    st.write("#### Step 6: Op Settings Scaling")
-    scaler_global = artifacts[dataset]['scaler']
-    op_values = raw_data[op_settings].values.reshape(1, -1)
-    op_scaled = scaler_global.transform(op_values)[0]
-    op_dict = {}
-    for i, col in enumerate(op_settings):
-        op_dict[col] = float(op_scaled[i])
-
-    op_df = pd.DataFrame(list(op_dict.items()), columns=['Op Setting', 'Scaled Value'])
-    st.dataframe(op_df, hide_index=True, use_container_width=True)
-
-    return regime
-
-def debug_scaling(processed_df, engine_id, cycle, dataset, artifacts):
-    """بررسی scaling در app"""
-
-    st.write("### 🔍 Debug: Scaling Check")
-
-    current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
-
-    if len(current_row) == 0:
-        st.error("Not found!")
-        return
-
-    # ==========================================
-    # بررسی scaler_dict مستقیماً از آرتیفکت
-    # ==========================================
-    st.write("### 🔍 Checking scaler_dict from artifact")
-
-    scaler_dict = artifacts[dataset]['scaler_dict']
-    st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
-
-    if 2 in scaler_dict:
-        # بررسی mean و scale برای سنسورهای اول
-        scaler = scaler_dict[2]
-        st.write(f"**Scaler for Regime 2:**")
-        st.write(f"  - mean (first 10): {scaler.mean_[:10] if hasattr(scaler, 'mean_') else 'N/A'}")
-        st.write(f"  - scale (first 10): {scaler.scale_[:10] if hasattr(scaler, 'scale_') else 'N/A'}")
-    # ==========================================
-
-    test_df, rul_df = load_raw_data(dataset)
-    raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
-
-    if len(raw_row) == 0:
-        st.error("Raw data not found!")
-        return
-
-    st.write("### Raw Sensor Values (before scaling):")
-    sensor_cols = [f'sensor_{i}' for i in range(1, 22)]
-    raw_data = {}
-    for col in sensor_cols:
-        if col in raw_row.columns:
-            raw_data[col] = raw_row[col].values[0]
-
-    raw_df = pd.DataFrame(list(raw_data.items()), columns=['Sensor', 'Raw Value'])
-    st.dataframe(raw_df, hide_index=True, use_container_width=True)
-
-    st.write("### Scaled Sensor Values (after scaling):")
-    scaled_data = {}
-    for col in sensor_cols:
-        if col in current_row.columns:
-            scaled_data[col] = current_row[col].values[0]
-
-    scaled_df = pd.DataFrame(list(scaled_data.items()), columns=['Sensor', 'Scaled Value'])
-    st.dataframe(scaled_df, hide_index=True, use_container_width=True)
-
-    if 'regime' in current_row.columns:
-        st.write(f"**Regime:** {current_row['regime'].values[0]}")
-
-    scaler_dict = artifacts[dataset]['scaler_dict']
-    st.write(f"**Available scalers:** {list(scaler_dict.keys())}")
-
-    notebook_values = {
-        'sensor_1': 0.0,
-        'sensor_2': -0.02085,
-        'sensor_3': 0.125843,
-        'sensor_4': -0.101434,
-        'sensor_5': 0.0,
-        'sensor_6': -0.17469,
-        'sensor_7': 1.840167,
-    }
-
-    st.write("### Comparison with Notebook:")
-    comparison = []
-    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
-        if col in current_row.columns and col in notebook_values:
-            app_val = current_row[col].values[0]
-            nb_val = notebook_values[col]
-            comparison.append({
-                'Sensor': col,
-                'Notebook': nb_val,
-                'App': app_val,
-                'Diff': abs(app_val - nb_val),
-                'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
-            })
-
-    st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
 
 def main():
     initialize_session_state()
@@ -2167,35 +2866,6 @@ def main():
                 st.write(f"- Total Features: {metadata.get('total_features', 'N/A')}")
                 if selected_dataset == 'FD002':
                     st.write(f"- Number of Regimes: {metadata.get('num_regimes', 'N/A')}")
-
-    # بعد از پردازش داده‌ها و قبل از predict_button
-    # در بخش main، بعد از processed_df
-    # در بخش Debug Tools
-    with st.expander("🔧 Debug Tools"):
-        col1, col2 = st.columns(2)
-        with col1:
-            debug_engine = st.number_input(
-                "Debug Engine ID",
-                value=68,
-                step=1,
-                key="debug_engine_input"  # ← کلید یکتا
-            )
-        with col2:
-            debug_cycle = st.number_input(
-                "Debug Cycle",
-                value=150,
-                step=1,
-                key="debug_cycle_input"  # ← کلید یکتا
-            )
-
-        if st.button("Run Step-by-Step Debug", key="debug_step_btn"):
-            debug_preprocessing_steps(selected_dataset, debug_engine, debug_cycle, artifacts)
-
-        if st.button("Run Scaling Debug", key="debug_scaling_btn"):
-            debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
-
-        if st.button("Run Feature Comparison", key="debug_feature_btn"):
-            debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
 
 
 if __name__ == "__main__":
