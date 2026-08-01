@@ -1300,6 +1300,7 @@ def initialize_session_state():
 
 
 def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
+
     # ==========================================
     # 🔍 بررسی window_info
     # ==========================================
@@ -1445,9 +1446,43 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
 
     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
 
+    st.write("### 🔍 Window Feature Types")
+
+    window_cols = [col for col in current_row.columns if any(x in col for x in
+                                                             ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
+                                                              '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
+
+    # شمارش هر نوع
+    types = {
+        '_roll_mean_W': 0,
+        '_roll_std_W': 0,
+        '_roll_min_W': 0,
+        '_roll_max_W': 0,
+        '_ewma_W': 0,
+        '_diff_W': 0,
+        '_slope_W': 0
+    }
+
+    for col in window_cols:
+        for key in types:
+            if key in col:
+                types[key] += 1
+                break
+
+    st.write("Feature type counts:")
+    for key, count in types.items():
+        st.write(f"  {key}: {count}")
+
+    total = sum(types.values())
+    st.write(f"Total: {total}")
+
+    if total != 525:
+        st.warning(f"⚠️ Expected 525, got {total}")
+    
     # ==========================================
     # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
     # ==========================================
+
     st.write("### 🔍 Window Features Check")
 
     window_cols = [col for col in current_row.columns if any(x in col for x in
