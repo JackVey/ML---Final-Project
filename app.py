@@ -955,8 +955,16 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
     anomaly_score = anomaly_scores['OCSVM']['percentile']
     interval_width = rul_upper - rul_lower
 
-    decision_params = artifacts[dataset]['decision_params']
-    final_thresholds = decision_params['final_thresholds']
+    final_thresholds = {
+        'rul_stop': 65,
+        'prob_stop': 0.05,
+        'anomaly_stop': 75,
+        'rul_inspect': 120,
+        'rul_inspect_lower': 90,
+        'prob_inspect': 0.08,
+        'anomaly_inspect': 78,
+        'monitor_prob': 0.05,
+    }
 
     if (rul_pred <= final_thresholds['rul_stop']) or \
             (rul_lower <= 30) or \
@@ -1020,7 +1028,6 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
             'triggers': ['All parameters within normal range'],
             'confidence': 'HIGH'
         }
-
 
 def get_dataset_description(dataset):
     descriptions = {
