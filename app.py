@@ -746,6 +746,45 @@ def load_raw_data(dataset):
 #
 #     return df_out
 
+
+# def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
+#     window_sizes = window_info['window_sizes']
+#     df_out = engine_df.copy()
+#
+#     if len(df_out) == 0:
+#         return df_out
+#
+#     grouped = df_out.groupby('engine_id')
+#
+#     for W in window_sizes:
+#         for col in feature_cols:
+#             if col not in df_out.columns:
+#                 continue
+#
+#             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+#
+#             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+#             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+#
+#             # ========== اضافه کردن EWMA و DIFF ==========
+#             df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
+#                 lambda x: x.ewm(span=W, adjust=False).mean()
+#             ).reset_index(level=0, drop=True)
+#
+#             df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
+#             # ============================================
+#
+#             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
+#                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
+#                 raw=True
+#             )
+#             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+#
+#     return df_out
+
+
 def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
     window_sizes = window_info['window_sizes']
     df_out = engine_df.copy()
@@ -767,13 +806,11 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
 
-            # ========== اضافه کردن EWMA و DIFF ==========
             df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
                 lambda x: x.ewm(span=W, adjust=False).mean()
             ).reset_index(level=0, drop=True)
 
             df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
-            # ============================================
 
             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
@@ -782,7 +819,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
 
     return df_out
-
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
