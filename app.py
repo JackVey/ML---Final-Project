@@ -945,7 +945,6 @@ def predict_anomaly(features, dataset, artifacts):
 def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_scores, dataset, artifacts):
     prob_h30 = failure_risks['h30']['probability']
     anomaly_score = anomaly_scores['OCSVM']['percentile']
-    interval_width = rul_upper - rul_lower
 
     final_thresholds = {
         'rul_stop': 65,
