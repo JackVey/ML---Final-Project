@@ -922,6 +922,8 @@ def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     # ✅ ترتیب طبیعی سنسورها (sensor_1, sensor_2, ...)
     # ==========================================
     sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
+    st.write("### 🔍 DEBUG: sensor_cols after natural sort")
+    st.write(f"sensor_cols: {sensor_cols[:10]}...")
     # ==========================================
 
     if dataset == 'FD001':
