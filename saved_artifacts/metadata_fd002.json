@@ -8,8 +8,14 @@
   "train_engines": 156,
   "val_engines": 52,
   "test_engines": 52,
-  "window_size": 50,
-  "total_features": 150,
+  "window_sizes": [
+    10,
+    20,
+    50,
+    100,
+    150
+  ],
+  "total_features": 654,
   "dropped_sensors": [],
   "kept_sensors": [
     "sensor_1",
