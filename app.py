@@ -1478,7 +1478,7 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
 
     if total != 525:
         st.warning(f"⚠️ Expected 525, got {total}")
-    
+
     # ==========================================
     # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
     # ==========================================
