@@ -834,6 +834,38 @@ def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, 
     return np.array(features)
 
 
+# def predict_rul(features, dataset, artifacts):
+#     ds_artifacts = artifacts[dataset]
+#     model = ds_artifacts['xgb_model']
+#     conformal_params = ds_artifacts['conformal_params']
+#
+#     feature_names = ds_artifacts['feature_names']
+#     expected_features = feature_names['all_features']
+#
+#     if len(features) != len(expected_features):
+#         if len(features) < len(expected_features):
+#             padded = np.zeros(len(expected_features))
+#             padded[:len(features)] = features
+#             features = padded
+#         else:
+#             features = features[:len(expected_features)]
+#
+#     pred = model.predict(features.reshape(1, -1))[0]
+#     rul_cap = ds_artifacts['rul_params']['rul_cap']
+#     pred_capped = np.clip(pred, None, rul_cap)
+#
+#     if pred_capped <= 50:
+#         q = conformal_params['q_95_near_failure']
+#     elif pred_capped <= 100:
+#         q = conformal_params['q_95_mid_life']
+#     else:
+#         q = conformal_params['q_95_early_life']
+#
+#     lower = max(0, pred_capped - q)
+#     upper = pred_capped + q
+#
+#     return pred_capped, lower, upper
+
 def predict_rul(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
     model = ds_artifacts['xgb_model']
@@ -842,17 +874,34 @@ def predict_rul(features, dataset, artifacts):
     feature_names = ds_artifacts['feature_names']
     expected_features = feature_names['all_features']
 
+    # ========== DEBUG ==========
+    st.write("### DEBUG: predict_rul")
+    st.write(f"Dataset: {dataset}")
+    st.write(f"Features length: {len(features)}")
+    st.write(f"Expected features length: {len(expected_features)}")
+
     if len(features) != len(expected_features):
+        st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
         if len(features) < len(expected_features):
             padded = np.zeros(len(expected_features))
             padded[:len(features)] = features
             features = padded
+            st.write(f"  Padded to {len(features)}")
         else:
             features = features[:len(expected_features)]
+            st.write(f"  Truncated to {len(expected_features)}")
+
+    # نمایش چند ویژگی اول برای بررسی
+    st.write(f"First 5 features: {features[:5]}")
+    st.write(f"Feature names (first 5): {expected_features[:5]}")
+    # ===========================
 
     pred = model.predict(features.reshape(1, -1))[0]
     rul_cap = ds_artifacts['rul_params']['rul_cap']
     pred_capped = np.clip(pred, None, rul_cap)
+
+    st.write(f"Raw prediction: {pred:.2f}")
+    st.write(f"Capped prediction: {pred_capped:.2f}")
 
     if pred_capped <= 50:
         q = conformal_params['q_95_near_failure']
@@ -863,6 +912,9 @@ def predict_rul(features, dataset, artifacts):
 
     lower = max(0, pred_capped - q)
     upper = pred_capped + q
+
+    st.write(f"q_95: {q:.2f}")
+    st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
 
     return pred_capped, lower, upper
 
