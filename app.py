@@ -1381,52 +1381,52 @@ def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
 
     test_df, rul_df = load_raw_data(dataset)
 
-    # مرحله 1: داده خام
     raw_data = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
     if len(raw_data) == 0:
         st.error("Raw data not found!")
         return
 
-    st.write("#### Step 1: Raw Data")
+    st.write("#### Step 1: Raw Data (First 7 sensors)")
     raw_sensors = {}
-    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
         if col in raw_data.columns:
-            raw_sensors[col] = raw_data[col].values[0]
-    st.dataframe(pd.DataFrame([raw_sensors]).T, columns=['Raw Value'])
+            raw_sensors[col] = float(raw_data[col].values[0])
 
-    # مرحله 2: بررسی scaler_dict
+    raw_df = pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value'])
+    st.dataframe(raw_df, hide_index=True, use_container_width=True)
+
     st.write("#### Step 2: Scaler Dict Check")
     scaler_dict = artifacts[dataset]['scaler_dict']
     st.write(f"Available scalers: {list(scaler_dict.keys())}")
 
-    # مرحله 3: بررسی kmeans
-    st.write("#### Step 3: KMeans Check")
+    st.write("#### Step 3: KMeans Regime Prediction")
     kmeans = artifacts[dataset]['kmeans']
     op_settings = ['op_setting_1', 'op_setting_2', 'op_setting_3']
     regime = kmeans.predict(raw_data[op_settings].values.reshape(1, -1))[0]
     st.write(f"Predicted Regime: {regime}")
 
-    # مرحله 4: اعمال scaling با scaler_dict
-    st.write("#### Step 4: Scaling Check")
-    scaler = scaler_dict[regime]
-    sensor_cols = [col for col in raw_data.columns if col.startswith('sensor_')]
-    raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
+    if regime not in scaler_dict:
+        st.error(f"Regime {regime} not in scaler_dict!")
+        return
 
-    # حذف nan و inf
+    st.write("#### Step 4: Apply scaler_dict")
+    scaler = scaler_dict[regime]
+    sensor_cols = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
+    raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
     raw_sensor_values = np.nan_to_num(raw_sensor_values, nan=0.0, posinf=0.0, neginf=0.0)
 
     try:
         scaled_values = scaler.transform(raw_sensor_values)[0]
         scaled_dict = {}
         for i, col in enumerate(sensor_cols):
-            scaled_dict[col] = scaled_values[i]
-        st.dataframe(pd.DataFrame([scaled_dict]).T, columns=['Scaled by scaler_dict'])
+            scaled_dict[col] = float(scaled_values[i])
+
+        scaled_df = pd.DataFrame(list(scaled_dict.items()), columns=['Sensor', 'Scaled Value'])
+        st.dataframe(scaled_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.error(f"Scaling error: {e}")
-        st.write(f"Raw values shape: {raw_sensor_values.shape}")
-        st.write(f"scaler mean shape: {scaler.mean_.shape}")
+        return
 
-    # مرحله 5: مقایسه با مقادیر نوت‌بوک
     st.write("#### Step 5: Comparison with Notebook")
     notebook_values = {
         'sensor_1': 0.0,
@@ -1438,29 +1438,33 @@ def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
     }
 
     comparison = []
-    if 'scaled_dict' in locals():
-        for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
-            if col in scaled_dict and col in notebook_values:
-                app_val = scaled_dict[col]
-                nb_val = notebook_values[col]
-                comparison.append({
-                    'Sensor': col,
-                    'Notebook': nb_val,
-                    'App': app_val,
-                    'Diff': abs(app_val - nb_val),
-                    'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
-                })
-        st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+    for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+        if col in scaled_dict and col in notebook_values:
+            app_val = scaled_dict[col]
+            nb_val = notebook_values[col]
+            comparison.append({
+                'Sensor': col,
+                'Notebook': nb_val,
+                'App': app_val,
+                'Diff': abs(app_val - nb_val),
+                'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
+            })
 
-    # مرحله 6: بررسی op_settings scaling
-    st.write("#### Step 6: Op Settings Check")
+    if comparison:
+        st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+    else:
+        st.write("No comparison data available")
+
+    st.write("#### Step 6: Op Settings Scaling")
     scaler_global = artifacts[dataset]['scaler']
     op_values = raw_data[op_settings].values.reshape(1, -1)
     op_scaled = scaler_global.transform(op_values)[0]
     op_dict = {}
     for i, col in enumerate(op_settings):
-        op_dict[col] = op_scaled[i]
-    st.dataframe(pd.DataFrame([op_dict]).T, columns=['Scaled Op Settings'])
+        op_dict[col] = float(op_scaled[i])
+
+    op_df = pd.DataFrame(list(op_dict.items()), columns=['Op Setting', 'Scaled Value'])
+    st.dataframe(op_df, hide_index=True, use_container_width=True)
 
     return regime
 
@@ -1801,99 +1805,31 @@ def main():
     # بعد از پردازش داده‌ها و قبل از predict_button
     # در بخش main، بعد از processed_df
     # در بخش Debug Tools
-    def debug_preprocessing_steps(dataset, engine_id, cycle, artifacts):
-        """بررسی مرحله به مرحله preprocessing"""
+    with st.expander("🔧 Debug Tools"):
+        col1, col2 = st.columns(2)
+        with col1:
+            debug_engine = st.number_input(
+                "Debug Engine ID",
+                value=68,
+                step=1,
+                key="debug_engine_input"  # ← کلید یکتا
+            )
+        with col2:
+            debug_cycle = st.number_input(
+                "Debug Cycle",
+                value=150,
+                step=1,
+                key="debug_cycle_input"  # ← کلید یکتا
+            )
 
-        st.write("### 🔍 Detailed Preprocessing Debug")
+        if st.button("Run Step-by-Step Debug", key="debug_step_btn"):
+            debug_preprocessing_steps(selected_dataset, debug_engine, debug_cycle, artifacts)
 
-        test_df, rul_df = load_raw_data(dataset)
+        if st.button("Run Scaling Debug", key="debug_scaling_btn"):
+            debug_scaling(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
 
-        raw_data = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
-        if len(raw_data) == 0:
-            st.error("Raw data not found!")
-            return
-
-        st.write("#### Step 1: Raw Data (First 7 sensors)")
-        raw_sensors = {}
-        for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_5', 'sensor_6', 'sensor_7']:
-            if col in raw_data.columns:
-                raw_sensors[col] = float(raw_data[col].values[0])
-
-        raw_df = pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value'])
-        st.dataframe(raw_df, hide_index=True, use_container_width=True)
-
-        st.write("#### Step 2: Scaler Dict Check")
-        scaler_dict = artifacts[dataset]['scaler_dict']
-        st.write(f"Available scalers: {list(scaler_dict.keys())}")
-
-        st.write("#### Step 3: KMeans Regime Prediction")
-        kmeans = artifacts[dataset]['kmeans']
-        op_settings = ['op_setting_1', 'op_setting_2', 'op_setting_3']
-        regime = kmeans.predict(raw_data[op_settings].values.reshape(1, -1))[0]
-        st.write(f"Predicted Regime: {regime}")
-
-        if regime not in scaler_dict:
-            st.error(f"Regime {regime} not in scaler_dict!")
-            return
-
-        st.write("#### Step 4: Apply scaler_dict")
-        scaler = scaler_dict[regime]
-        sensor_cols = sorted([col for col in raw_data.columns if col.startswith('sensor_')])
-        raw_sensor_values = raw_data[sensor_cols].values.reshape(1, -1)
-        raw_sensor_values = np.nan_to_num(raw_sensor_values, nan=0.0, posinf=0.0, neginf=0.0)
-
-        try:
-            scaled_values = scaler.transform(raw_sensor_values)[0]
-            scaled_dict = {}
-            for i, col in enumerate(sensor_cols):
-                scaled_dict[col] = float(scaled_values[i])
-
-            scaled_df = pd.DataFrame(list(scaled_dict.items()), columns=['Sensor', 'Scaled Value'])
-            st.dataframe(scaled_df, hide_index=True, use_container_width=True)
-        except Exception as e:
-            st.error(f"Scaling error: {e}")
-            return
-
-        st.write("#### Step 5: Comparison with Notebook")
-        notebook_values = {
-            'sensor_1': 0.0,
-            'sensor_2': -0.02085,
-            'sensor_3': 0.125843,
-            'sensor_4': -0.101434,
-            'sensor_6': -0.17469,
-            'sensor_7': 1.840167,
-        }
-
-        comparison = []
-        for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
-            if col in scaled_dict and col in notebook_values:
-                app_val = scaled_dict[col]
-                nb_val = notebook_values[col]
-                comparison.append({
-                    'Sensor': col,
-                    'Notebook': nb_val,
-                    'App': app_val,
-                    'Diff': abs(app_val - nb_val),
-                    'Match': '✅' if abs(app_val - nb_val) < 0.001 else '❌'
-                })
-
-        if comparison:
-            st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
-        else:
-            st.write("No comparison data available")
-
-        st.write("#### Step 6: Op Settings Scaling")
-        scaler_global = artifacts[dataset]['scaler']
-        op_values = raw_data[op_settings].values.reshape(1, -1)
-        op_scaled = scaler_global.transform(op_values)[0]
-        op_dict = {}
-        for i, col in enumerate(op_settings):
-            op_dict[col] = float(op_scaled[i])
-
-        op_df = pd.DataFrame(list(op_dict.items()), columns=['Op Setting', 'Scaled Value'])
-        st.dataframe(op_df, hide_index=True, use_container_width=True)
-
-        return regime
+        if st.button("Run Feature Comparison", key="debug_feature_btn"):
+            debug_engine_comparison(processed_df, debug_engine, debug_cycle, selected_dataset, artifacts)
 
 
 if __name__ == "__main__":
