@@ -658,7 +658,6 @@ import joblib
 import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from pathlib import Path
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -711,23 +710,33 @@ def load_artifacts():
 
 @st.cache_data
 def load_raw_data(dataset):
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in range(1, 22)]
-
-    train_df = pd.read_csv(f'data/train_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
+                                                                                     range(1, 22)]
     test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
     rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
+    return test_df, rul_df
 
-    return train_df, test_df, rul_df
+
+@st.cache_data
+def load_raw_train_data(dataset):
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
+                                                                                     range(1, 22)]
+    train_df = pd.read_csv(f'data/train_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
+    return train_df
 
 
-def extract_multi_window_features(df, window_info, feature_cols):
+def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
     window_sizes = window_info['window_sizes']
-    df_out = df.copy()
+    df_out = engine_df.copy()
+
+    if len(df_out) == 0:
+        return df_out
+
     grouped = df_out.groupby('engine_id')
 
     for W in window_sizes:
         for col in feature_cols:
-            if col not in df.columns:
+            if col not in df_out.columns:
                 continue
 
             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
@@ -736,12 +745,6 @@ def extract_multi_window_features(df, window_info, feature_cols):
             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
-
-            df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
-                lambda x: x.ewm(span=W, adjust=False).mean()
-            ).reset_index(level=0, drop=True)
-
-            df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
 
             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
@@ -752,68 +755,68 @@ def extract_multi_window_features(df, window_info, feature_cols):
     return df_out
 
 
-def preprocess_data(dataset, test_df, rul_df, artifacts):
+def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts, train_df=None):
     ds_artifacts = artifacts[dataset]
+
+    engine_df = test_df[test_df['engine_id'] == engine_id].copy()
+
+    if len(engine_df) == 0:
+        return pd.DataFrame()
 
     test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
     rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
 
-    test_df['max_cycle'] = test_df['engine_id'].map(test_max_cycle)
-    test_df['RUL_final'] = test_df['engine_id'].map(rul_mapping)
-    test_df['RUL'] = test_df['max_cycle'] - test_df['cycle'] + test_df['RUL_final']
+    engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
+    engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
+    engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
 
     rul_cap = ds_artifacts['rul_params']['rul_cap']
-    test_df['RUL_capped'] = test_df['RUL'].clip(upper=rul_cap)
+    engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
 
-    test_df_raw = test_df.copy()
+    engine_df_raw = engine_df.copy()
 
     feature_info = ds_artifacts['feature_info']
     features_to_scale = feature_info['all_features']
     scaler = ds_artifacts['scaler']
 
-    if dataset == 'FD001':
-        dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
-    else:
-        dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
-
+    dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
     if dropped_sensors:
-        test_df = test_df.drop(columns=dropped_sensors, errors='ignore')
-        test_df_raw = test_df_raw.drop(columns=dropped_sensors, errors='ignore')
+        engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
+        engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
 
-    sensor_cols = [col for col in test_df.columns if col.startswith('sensor_')]
+    sensor_cols = [col for col in engine_df.columns if col.startswith('sensor_')]
 
     if dataset == 'FD001':
-        test_df[features_to_scale] = scaler.transform(test_df[features_to_scale])
+        engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
     else:
         op_settings = feature_info['op_settings']
-        test_df[op_settings] = scaler.transform(test_df[op_settings])
+        engine_df[op_settings] = scaler.transform(engine_df[op_settings])
 
         sensor_cols_scaled = feature_info['active_sensors']
         scaler_dict = ds_artifacts['scaler_dict']
         kmeans = ds_artifacts['kmeans']
 
-        test_df['regime'] = kmeans.predict(test_df[op_settings])
+        engine_df['regime'] = kmeans.predict(engine_df[op_settings])
 
         for col in sensor_cols_scaled:
-            test_df[col] = test_df[col].astype(float)
+            engine_df[col] = engine_df[col].astype(float)
 
         for r in range(6):
-            regime_mask = test_df['regime'] == r
+            regime_mask = engine_df['regime'] == r
             if regime_mask.sum() > 0 and r in scaler_dict:
-                test_df.loc[regime_mask, sensor_cols_scaled] = scaler_dict[r].transform(
-                    test_df.loc[regime_mask, sensor_cols_scaled])
+                engine_df.loc[regime_mask, sensor_cols_scaled] = scaler_dict[r].transform(
+                    engine_df.loc[regime_mask, sensor_cols_scaled])
 
     window_info = ds_artifacts['window_info']
     feature_cols = window_info['feature_cols']
-
-    active_cols = [col for col in feature_cols if col in test_df.columns]
-    test_df = extract_multi_window_features(test_df, window_info, active_cols)
+    active_cols = [col for col in feature_cols if col in engine_df.columns]
+    engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
 
     for col in sensor_cols:
-        if col in test_df_raw.columns:
-            test_df[col + '_raw'] = test_df_raw[col]
+        if col in engine_df_raw.columns:
+            engine_df[col + '_raw'] = engine_df_raw[col]
 
-    return test_df
+    return engine_df
 
 
 def predict_rul(features, dataset, artifacts):
@@ -864,7 +867,6 @@ def predict_failure_risk(features, dataset, artifacts):
             'threshold': threshold,
             'alert': prob >= threshold
         }
-
     return risks
 
 
@@ -903,9 +905,8 @@ def predict_anomaly(features, dataset, artifacts):
         scores[name] = {
             'raw_score': float(raw_score),
             'percentile': float(percentile),
-            'alert': raw_score >= 95
+            'alert': percentile >= 95
         }
-
     return scores
 
 
@@ -925,12 +926,14 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
 
         triggers = []
         if rul_lower < stop_rules['rul_lower_bound']:
-            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rules['rul_lower_bound']})")
+            triggers.append(
+                f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rules['rul_lower_bound']})")
         if prob_h30 > stop_rules['failure_prob_threshold']:
             triggers.append(
                 f"Failure probability ({prob_h30:.1%}) above critical threshold ({stop_rules['failure_prob_threshold']:.0%})")
         if anomaly_score > stop_rules['anomaly_threshold']:
-            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_rules['anomaly_threshold']})")
+            triggers.append(
+                f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_rules['anomaly_threshold']})")
 
         return {
             'action': 'STOP',
@@ -946,7 +949,8 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
 
         triggers = []
         if rul_lower < inspect_rules['rul_lower_bound']:
-            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rules['rul_lower_bound']})")
+            triggers.append(
+                f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rules['rul_lower_bound']})")
         if prob_h30 > inspect_rules['failure_prob_threshold']:
             triggers.append(
                 f"Failure probability ({prob_h30:.1%}) above inspect threshold ({inspect_rules['failure_prob_threshold']:.0%})")
@@ -999,18 +1003,26 @@ def main():
         )
 
         with st.spinner(f"Loading {selected_dataset} data..."):
-            train_df, test_df, rul_df = load_raw_data(selected_dataset)
-            processed_df = preprocess_data(selected_dataset, test_df, rul_df, artifacts)
+            test_df, rul_df = load_raw_data(selected_dataset)
+            train_df = load_raw_train_data(selected_dataset)
 
-        engines = sorted(processed_df['engine_id'].unique())
+        engines = sorted(test_df['engine_id'].unique())
         selected_engine = st.selectbox(
             "Select Engine ID",
             engines,
             format_func=lambda x: f"Engine #{x}"
         )
 
-        engine_data = processed_df[processed_df['engine_id'] == selected_engine]
-        cycles = sorted(engine_data['cycle'].unique())
+        with st.spinner(f"Processing engine {selected_engine} data..."):
+            processed_df = preprocess_engine_data(
+                selected_dataset, selected_engine, test_df, rul_df, artifacts, train_df
+            )
+
+        if len(processed_df) == 0:
+            st.error(f"No data found for engine {selected_engine}")
+            return
+
+        cycles = sorted(processed_df['cycle'].unique())
         selected_cycle = st.slider(
             "Select Cycle",
             min_value=min(cycles),
@@ -1025,7 +1037,7 @@ def main():
         if predict_button:
             st.session_state.prediction_done = True
 
-        current_row = engine_data[engine_data['cycle'] == selected_cycle]
+        current_row = processed_df[processed_df['cycle'] == selected_cycle]
         if len(current_row) == 0:
             st.error("Invalid selection! Please choose a valid cycle.")
             return
@@ -1065,7 +1077,6 @@ def main():
                 st.session_state.anomaly_scores = anomaly_scores
                 st.session_state.recommendation = recommendation
                 st.session_state.processed_df = processed_df
-                st.session_state.engine_data = engine_data
                 st.session_state.selected_cycle = selected_cycle
                 st.session_state.selected_dataset = selected_dataset
                 st.session_state.artifacts = artifacts
@@ -1078,7 +1089,6 @@ def main():
             anomaly_scores = st.session_state.anomaly_scores
             recommendation = st.session_state.recommendation
             processed_df = st.session_state.processed_df
-            engine_data = st.session_state.engine_data
             selected_cycle = st.session_state.selected_cycle
             selected_dataset = st.session_state.selected_dataset
             artifacts = st.session_state.artifacts
@@ -1175,16 +1185,16 @@ def main():
                                     vertical_spacing=0.15)
 
                 fig.add_trace(
-                    go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='True RUL',
+                    go.Scatter(x=processed_df['cycle'], y=processed_df['RUL'], mode='lines', name='True RUL',
                                line=dict(color='green', width=2)),
                     row=1, col=1
                 )
                 fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
 
                 anomaly_col = 'OCSVM_Anomaly_Score'
-                if anomaly_col in engine_data.columns:
+                if anomaly_col in processed_df.columns:
                     fig.add_trace(
-                        go.Scatter(x=engine_data['cycle'], y=engine_data[anomaly_col], mode='lines',
+                        go.Scatter(x=processed_df['cycle'], y=processed_df[anomaly_col], mode='lines',
                                    name='Anomaly Score',
                                    line=dict(color='orange', width=2)),
                         row=2, col=1
@@ -1198,13 +1208,13 @@ def main():
                 fig = go.Figure()
 
                 fig.add_trace(
-                    go.Scatter(x=engine_data['cycle'], y=engine_data[selected_sensor], mode='lines',
+                    go.Scatter(x=processed_df['cycle'], y=processed_df[selected_sensor], mode='lines',
                                name=selected_sensor.replace('_raw', ''),
                                line=dict(color='blue', width=2))
                 )
 
                 fig.add_trace(
-                    go.Scatter(x=engine_data['cycle'], y=engine_data['RUL'], mode='lines', name='RUL',
+                    go.Scatter(x=processed_df['cycle'], y=processed_df['RUL'], mode='lines', name='RUL',
                                line=dict(color='green', width=2, dash='dot'), yaxis='y2')
                 )
 
