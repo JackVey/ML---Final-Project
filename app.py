@@ -1317,6 +1317,83 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
         return
 
     # ==========================================
+    # 🔍 بررسی regime
+    # ==========================================
+    if 'regime' in current_row.columns:
+        regime = current_row['regime'].values[0]
+        st.write(f"**Regime:** {regime}")
+    else:
+        st.write("**Regime:** Not found in processed_df")
+    # ==========================================
+
+    # ==========================================
+    # 🔍 بررسی scaler_dict
+    # ==========================================
+    st.write("### 🔍 Checking scaler_dict")
+    scaler_dict = artifacts[dataset]['scaler_dict']
+    st.write(f"Available scalers: {list(scaler_dict.keys())}")
+
+    if 'regime' in current_row.columns:
+        regime = current_row['regime'].values[0]
+        if regime in scaler_dict:
+            scaler = scaler_dict[regime]
+            st.write(f"**Scaler for Regime {regime}:**")
+            st.write(f"  - mean (first 10): {scaler.mean_[:10]}")
+            st.write(f"  - scale (first 10): {scaler.scale_[:10]}")
+
+            # بررسی raw values برای همان سنسورها
+            test_df, rul_df = load_raw_data(dataset)
+            raw_row = test_df[(test_df['engine_id'] == engine_id) & (test_df['cycle'] == cycle)]
+            if len(raw_row) > 0:
+                st.write("### Raw values from test_df:")
+                raw_sensors = {}
+                for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+                    if col in raw_row.columns:
+                        raw_sensors[col] = float(raw_row[col].values[0])
+                st.dataframe(pd.DataFrame(list(raw_sensors.items()), columns=['Sensor', 'Raw Value']))
+
+                # اعمال scaling با scaler_dict
+                sensor_cols = sorted([col for col in raw_row.columns if col.startswith('sensor_')])
+                raw_values = raw_row[sensor_cols].values.reshape(1, -1)
+                raw_values = np.nan_to_num(raw_values, nan=0.0, posinf=0.0, neginf=0.0)
+                scaled_manual = scaler.transform(raw_values)[0]
+
+                st.write("### Manually scaled values (using scaler_dict):")
+                scaled_manual_dict = {}
+                for i, col in enumerate(sensor_cols[:7]):
+                    scaled_manual_dict[col] = float(scaled_manual[i])
+                st.dataframe(pd.DataFrame(list(scaled_manual_dict.items()), columns=['Sensor', 'Manual Scaled']))
+
+                # مقایسه با مقادیر current_row
+                st.write("### Comparison: Manual vs Processed")
+                comparison_scaled = []
+                for col in ['sensor_1', 'sensor_2', 'sensor_3', 'sensor_4', 'sensor_6', 'sensor_7']:
+                    if col in current_row.columns and col in scaled_manual_dict:
+                        app_val = current_row[col].values[0]
+                        manual_val = scaled_manual_dict[col]
+                        comparison_scaled.append({
+                            'Sensor': col,
+                            'Manual Scaled': manual_val,
+                            'App Scaled': app_val,
+                            'Diff': abs(app_val - manual_val),
+                            'Match': '✅' if abs(app_val - manual_val) < 0.001 else '❌'
+                        })
+                st.dataframe(pd.DataFrame(comparison_scaled), hide_index=True, use_container_width=True)
+        else:
+            st.error(f"Regime {regime} not in scaler_dict!")
+    # ==========================================
+
+    # ... ادامه کد قبلی ...    """مقایسه مستقیم ویژگی‌های یک موتور خاص با نوت‌بوک"""
+
+    st.write(f"### 🔍 Debug: Engine {engine_id}, Cycle {cycle}")
+
+    current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
+
+    if len(current_row) == 0:
+        st.error(f"Engine {engine_id}, Cycle {cycle} not found!")
+        return
+
+    # ==========================================
     # 🔍 بررسی feature_names
     # ==========================================
     st.write("### 🔍 Checking feature_names")
