@@ -1326,7 +1326,7 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
         st.write("**Regime:** Not found in processed_df")
 
     # ==========================================
-    # 🔍 بررسی scaler_dict و مقایسه کامل
+    # 🔍 بررسی scaler_dict و مقایسه کامل سنسورها
     # ==========================================
     st.write("### 🔍 Full Comparison: All Sensors")
 
@@ -1362,25 +1362,13 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
 
         st.dataframe(pd.DataFrame(comparison_data), hide_index=True, use_container_width=True)
 
-        # بررسی سنسورهایی که متفاوت هستند
         mismatched = [row for row in comparison_data if row['Match'] == '❌']
         if mismatched:
             st.warning(f"⚠️ {len(mismatched)} sensors have mismatched values!")
-            st.write("Mismatched sensors:")
-            st.dataframe(pd.DataFrame(mismatched), hide_index=True, use_container_width=True)
         else:
             st.success("✅ All sensors match!")
     else:
         st.error(f"Regime {regime} not in scaler_dict!")
-
-    # ... ادامه کد قبلی ...
-    st.write(f"### 🔍 Debug: Engine {engine_id}, Cycle {cycle}")
-
-    current_row = processed_df[(processed_df['engine_id'] == engine_id) & (processed_df['cycle'] == cycle)]
-
-    if len(current_row) == 0:
-        st.error(f"Engine {engine_id}, Cycle {cycle} not found!")
-        return
 
     # ==========================================
     # 🔍 بررسی feature_names
@@ -1391,13 +1379,11 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
     st.write(f"Total features in feature_names: {len(all_features)}")
     st.write(f"First 20 features: {all_features[:20]}")
 
-    # بررسی تطابق با ستون‌های processed_df
     missing_in_processed = [col for col in all_features if col not in processed_df.columns]
     if missing_in_processed:
         st.warning(f"⚠️ Missing {len(missing_in_processed)} features in processed_df: {missing_in_processed[:10]}...")
     else:
         st.success("✅ All features exist in processed_df")
-    # ==========================================
 
     expected_features = all_features
 
@@ -1456,6 +1442,48 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
             })
 
     st.dataframe(pd.DataFrame(comparison), hide_index=True, use_container_width=True)
+
+    # ==========================================
+    # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
+    # ==========================================
+    st.write("### 🔍 Window Features Check")
+
+    window_cols = [col for col in current_row.columns if any(x in col for x in
+                                                             ['_roll_mean_W', '_roll_std_W', '_roll_min_W',
+                                                              '_roll_max_W', '_ewma_W', '_diff_W', '_slope_W'])]
+    st.write(f"Total window features: {len(window_cols)}")
+
+    st.write("First 10 window features (with values):")
+    window_data = []
+    for i, col in enumerate(window_cols[:10]):
+        val = current_row[col].values[0]
+        window_data.append({
+            'Index': i,
+            'Feature': col,
+            'Value': val
+        })
+    st.dataframe(pd.DataFrame(window_data), hide_index=True, use_container_width=True)
+
+    # ==========================================
+    # 🔍 بررسی تعداد کل ویژگی‌ها
+    # ==========================================
+    st.write("### 🔍 Feature Count Summary")
+    st.write(f"Total features in expected_features: {len(expected_features)}")
+    st.write(f"Total features in current_row: {len(current_row.columns)}")
+
+    non_feature_cols = ['engine_id', 'cycle', 'RUL', 'RUL_capped', 'max_cycle', 'RUL_final', 'regime']
+    actual_feature_cols = [col for col in current_row.columns if
+                           col not in non_feature_cols and not col.endswith('_raw')]
+    st.write(f"Actual feature columns (excluding non-features): {len(actual_feature_cols)}")
+
+    # بررسی تفاوت
+    if len(expected_features) != len(actual_feature_cols):
+        st.warning(f"⚠️ Feature count mismatch: expected {len(expected_features)}, got {len(actual_feature_cols)}")
+        diff_cols = set(expected_features) - set(actual_feature_cols)
+        if diff_cols:
+            st.write(f"Missing in actual: {list(diff_cols)[:10]}...")
+    else:
+        st.success("✅ Feature count matches!")
 
     # پیش‌بینی RUL
     features_array = np.array(features).reshape(1, -1)
