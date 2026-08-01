@@ -717,6 +717,35 @@ def load_raw_data(dataset):
     return test_df, rul_df
 
 
+# def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
+#     window_sizes = window_info['window_sizes']
+#     df_out = engine_df.copy()
+#
+#     if len(df_out) == 0:
+#         return df_out
+#
+#     grouped = df_out.groupby('engine_id')
+#
+#     for W in window_sizes:
+#         for col in feature_cols:
+#             if col not in df_out.columns:
+#                 continue
+#
+#             rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+#
+#             df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
+#             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
+#             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+#
+#             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
+#                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
+#                 raw=True
+#             )
+#             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+#
+#     return df_out
+
 def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
     window_sizes = window_info['window_sizes']
     df_out = engine_df.copy()
@@ -738,6 +767,14 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
             df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
 
+            # ========== اضافه کردن EWMA و DIFF ==========
+            df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
+                lambda x: x.ewm(span=W, adjust=False).mean()
+            ).reset_index(level=0, drop=True)
+
+            df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
+            # ============================================
+
             slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
                 lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
                 raw=True
@@ -745,7 +782,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
 
     return df_out
-
 
 def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
     ds_artifacts = artifacts[dataset]
@@ -866,43 +902,57 @@ def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, 
 #
 #     return pred_capped, lower, upper
 
-def extract_multi_window_features_single_engine(engine_df, window_info, feature_cols):
-    window_sizes = window_info['window_sizes']
-    df_out = engine_df.copy()
+def predict_rul(features, dataset, artifacts):
+    ds_artifacts = artifacts[dataset]
+    model = ds_artifacts['xgb_model']
+    conformal_params = ds_artifacts['conformal_params']
 
-    if len(df_out) == 0:
-        return df_out
+    feature_names = ds_artifacts['feature_names']
+    expected_features = feature_names['all_features']
 
-    grouped = df_out.groupby('engine_id')
+    # ========== DEBUG ==========
+    st.write("### DEBUG: predict_rul")
+    st.write(f"Dataset: {dataset}")
+    st.write(f"Features length: {len(features)}")
+    st.write(f"Expected features length: {len(expected_features)}")
 
-    for W in window_sizes:
-        for col in feature_cols:
-            if col not in df_out.columns:
-                continue
+    if len(features) != len(expected_features):
+        st.write(f"⚠️ Feature mismatch: got {len(features)}, expected {len(expected_features)}")
+        if len(features) < len(expected_features):
+            padded = np.zeros(len(expected_features))
+            padded[:len(features)] = features
+            features = padded
+            st.write(f"  Padded to {len(features)}")
+        else:
+            features = features[:len(expected_features)]
+            st.write(f"  Truncated to {len(expected_features)}")
 
-            rolling_obj = grouped[col].rolling(window=W, min_periods=1)
+    # نمایش چند ویژگی اول برای بررسی
+    st.write(f"First 5 features: {features[:5]}")
+    st.write(f"Feature names (first 5): {expected_features[:5]}")
+    # ===========================
 
-            df_out[f'{col}_roll_mean_W{W}'] = rolling_obj.mean().reset_index(level=0, drop=True)
-            df_out[f'{col}_roll_std_W{W}'] = rolling_obj.std().reset_index(level=0, drop=True).fillna(0)
-            df_out[f'{col}_roll_min_W{W}'] = rolling_obj.min().reset_index(level=0, drop=True)
-            df_out[f'{col}_roll_max_W{W}'] = rolling_obj.max().reset_index(level=0, drop=True)
+    pred = model.predict(features.reshape(1, -1))[0]
+    rul_cap = ds_artifacts['rul_params']['rul_cap']
+    pred_capped = np.clip(pred, None, rul_cap)
 
-            # ========== اضافه کردن EWMA و DIFF ==========
-            df_out[f'{col}_ewma_W{W}'] = grouped[col].apply(
-                lambda x: x.ewm(span=W, adjust=False).mean()
-            ).reset_index(level=0, drop=True)
+    st.write(f"Raw prediction: {pred:.2f}")
+    st.write(f"Capped prediction: {pred_capped:.2f}")
 
-            df_out[f'{col}_diff_W{W}'] = grouped[col].diff().fillna(0)
-            # ============================================
+    if pred_capped <= 50:
+        q = conformal_params['q_95_near_failure']
+    elif pred_capped <= 100:
+        q = conformal_params['q_95_mid_life']
+    else:
+        q = conformal_params['q_95_early_life']
 
-            slope_col = grouped[col].rolling(window=W, min_periods=2).apply(
-                lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] if len(x) > 1 else 0,
-                raw=True
-            )
-            df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
+    lower = max(0, pred_capped - q)
+    upper = pred_capped + q
 
-    return df_out
+    st.write(f"q_95: {q:.2f}")
+    st.write(f"95% CI: [{lower:.2f}, {upper:.2f}]")
 
+    return pred_capped, lower, upper
 
 def predict_failure_risk(features, dataset, artifacts):
     ds_artifacts = artifacts[dataset]
