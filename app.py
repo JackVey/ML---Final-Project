@@ -888,7 +888,7 @@ def predict_failure_risk(features, dataset, artifacts):
     for h in horizons:
         model = calibrated_models[h]['XGBoost']
         prob = model.predict_proba(features.reshape(1, -1))[0, 1]
-        threshold = tuned_thresholds[h]['XGBoost']
+        threshold = tuned_thresholds[str(h)]['XGBoost']
         risks[f'h{h}'] = {
             'probability': prob,
             'threshold': threshold,
