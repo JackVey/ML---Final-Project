@@ -57,11 +57,25 @@ def load_artifacts():
 
 @st.cache_data
 def load_raw_data(dataset):
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
-                                                                                     range(1, 22)]
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in range(1, 22)]
     test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
     rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
     return test_df, rul_df
+
+
+@st.cache_data
+def load_preprocessed_fd001():
+    """بارگذاری داده‌های از پیش پردازش‌شده FD001 از فایل‌های .csv.gz فشرده"""
+    try:
+        df = pd.read_csv('data/test_window_fd001_preprocessed.csv.gz', compression='gzip')
+        rul_df = pd.read_csv('data/rul_final_fd001.csv.gz', compression='gzip')
+        return df, rul_df
+    except FileNotFoundError as e:
+        st.error(f"File not found: {e}")
+        return None, None
+    except Exception as e:
+        st.error(f"Error loading preprocessed data: {e}")
+        return None, None
 
 
 @st.cache_data
@@ -73,7 +87,6 @@ def load_preprocessed_fd002():
         return df, rul_df
     except FileNotFoundError as e:
         st.error(f"File not found: {e}")
-        st.info("Please make sure the preprocessed data files are in the 'data' folder.")
         return None, None
     except Exception as e:
         st.error(f"Error loading preprocessed data: {e}")
@@ -108,74 +121,6 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
             df_out[f'{col}_slope_W{W}'] = slope_col.reset_index(level=0, drop=True).fillna(0)
 
     return df_out
-
-
-def preprocess_engine_data(dataset, engine_id, test_df, rul_df, artifacts):
-    ds_artifacts = artifacts[dataset]
-
-    engine_df = test_df[test_df['engine_id'] == engine_id].copy()
-
-    if len(engine_df) == 0:
-        return pd.DataFrame()
-
-    test_max_cycle = test_df.groupby('engine_id')['cycle'].max().to_dict()
-    rul_mapping = {engine: rul_df.iloc[i, 0] for i, engine in enumerate(test_df['engine_id'].unique())}
-
-    engine_df['max_cycle'] = engine_df['engine_id'].map(test_max_cycle)
-    engine_df['RUL_final'] = engine_df['engine_id'].map(rul_mapping)
-    engine_df['RUL'] = engine_df['max_cycle'] - engine_df['cycle'] + engine_df['RUL_final']
-
-    rul_cap = ds_artifacts['rul_params']['rul_cap']
-    engine_df['RUL_capped'] = engine_df['RUL'].clip(upper=rul_cap)
-
-    engine_df_raw = engine_df.copy()
-
-    feature_info = ds_artifacts['feature_info']
-    features_to_scale = feature_info['all_features']
-    scaler = ds_artifacts['scaler']
-
-    dropped_sensors = ds_artifacts['metadata']['dropped_sensors']
-    if dropped_sensors:
-        engine_df = engine_df.drop(columns=dropped_sensors, errors='ignore')
-        engine_df_raw = engine_df_raw.drop(columns=dropped_sensors, errors='ignore')
-
-    active_sensors = feature_info['active_sensors']
-    sensor_cols = [col for col in active_sensors if col in engine_df.columns]
-    sensor_cols = sorted(sensor_cols, key=lambda x: int(x.split('_')[1]))
-
-    if dataset == 'FD001':
-        engine_df[features_to_scale] = scaler.transform(engine_df[features_to_scale])
-    else:
-        op_settings = feature_info['op_settings']
-        engine_df[op_settings] = scaler.transform(engine_df[op_settings])
-
-        scaler_dict = ds_artifacts['scaler_dict']
-        kmeans = ds_artifacts['kmeans']
-
-        engine_df['regime'] = kmeans.predict(engine_df[op_settings])
-
-        for col in sensor_cols:
-            engine_df[col] = engine_df[col].astype(float)
-
-        for r in range(6):
-            regime_mask = engine_df['regime'] == r
-            if regime_mask.sum() > 0 and r in scaler_dict:
-                try:
-                    engine_df.loc[regime_mask, sensor_cols] = scaler_dict[r].transform(
-                        engine_df.loc[regime_mask, sensor_cols])
-                except Exception as e:
-                    pass
-
-    window_info = ds_artifacts['window_info']
-    feature_cols = window_info['feature_cols']
-    active_cols = [col for col in feature_cols if col in engine_df.columns]
-    engine_df = extract_multi_window_features_single_engine(engine_df, window_info, active_cols)
-
-    for col in sensor_cols:
-        if col in engine_df_raw.columns:
-            engine_df[col + '_raw'] = engine_df_raw[col]
-
-    return engine_df
 
 
 def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
@@ -482,6 +427,7 @@ def main():
 
     with st.spinner("Loading model artifacts..."):
         artifacts = load_artifacts()
+        preprocessed_fd001, rul_fd001 = load_preprocessed_fd001()
         preprocessed_fd002, rul_fd002 = load_preprocessed_fd002()
 
     with st.sidebar:
@@ -495,57 +441,43 @@ def main():
         )
 
         with st.spinner(f"Loading {selected_dataset} data..."):
-            if selected_dataset == 'FD002':
+            if selected_dataset == 'FD001':
+                test_df = preprocessed_fd001
+                rul_df = rul_fd001
+            else:
                 test_df = preprocessed_fd002
                 rul_df = rul_fd002
-                engines = sorted(test_df['engine_id'].unique())
-                selected_engine = st.selectbox(
-                    "Select Engine ID",
-                    engines,
-                    format_func=lambda x: f"Engine #{x}"
-                )
-                st.session_state.selected_engine = selected_engine
-                engine_data = test_df[test_df['engine_id'] == selected_engine]
-                cycles = sorted(engine_data['cycle'].unique())
-                selected_cycle = st.slider(
-                    "Select Cycle",
-                    min_value=min(cycles),
-                    max_value=max(cycles),
-                    value=max(cycles),
-                    step=1
-                )
-                processed_df = test_df
-            else:
-                raw_test, raw_rul = load_raw_data(selected_dataset)
-                engines = sorted(raw_test['engine_id'].unique())
-                selected_engine = st.selectbox(
-                    "Select Engine ID",
-                    engines,
-                    format_func=lambda x: f"Engine #{x}"
-                )
-                st.session_state.selected_engine = selected_engine
-                with st.spinner(f"Processing engine {selected_engine} data..."):
-                    processed_df = preprocess_engine_data(
-                        selected_dataset, selected_engine, raw_test, raw_rul, artifacts
-                    )
-                    if len(processed_df) == 0:
-                        st.error(f"No data found for engine {selected_engine}")
-                        return
-                cycles = sorted(processed_df['cycle'].unique())
-                selected_cycle = st.slider(
-                    "Select Cycle",
-                    min_value=min(cycles),
-                    max_value=max(cycles),
-                    value=max(cycles),
-                    step=1
-                )
+
+            engines = sorted(test_df['engine_id'].unique())
+            selected_engine = st.selectbox(
+                "Select Engine ID",
+                engines,
+                format_func=lambda x: f"Engine #{x}"
+            )
+            st.session_state.selected_engine = selected_engine
+            engine_data = test_df[test_df['engine_id'] == selected_engine]
+            cycles = sorted(engine_data['cycle'].unique())
+            selected_cycle = st.slider(
+                "Select Cycle",
+                min_value=min(cycles),
+                max_value=max(cycles),
+                value=max(cycles),
+                step=1
+            )
+            processed_df = test_df
 
         predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
 
     if predict_button:
         st.session_state.prediction_done = True
 
-        if selected_dataset == 'FD002':
+        if selected_dataset == 'FD001':
+            features = get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts)
+            if features is None:
+                st.error("Could not extract features for prediction")
+                return
+            rul_pred, rul_lower, rul_upper = predict_rul_fd001(features, selected_dataset, artifacts)
+        else:
             rul_pred, rul_lower, rul_upper = predict_rul_fd002(selected_engine, selected_cycle, processed_df, artifacts)
             if rul_pred is None:
                 st.error("Invalid selection!")
@@ -562,12 +494,6 @@ def main():
                 else:
                     features.append(0.0)
             features = np.array(features)
-        else:
-            features = get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts)
-            if features is None:
-                st.error("Could not extract features for prediction")
-                return
-            rul_pred, rul_lower, rul_upper = predict_rul_fd001(features, selected_dataset, artifacts)
 
         with st.spinner("Making predictions..."):
             risks = predict_failure_risk(features, selected_dataset, artifacts)
@@ -674,6 +600,7 @@ def main():
 
         dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
 
+        # برای پلات سنسورها از داده‌های خام استفاده کن
         raw_test_df, _ = load_raw_data(selected_dataset)
         raw_engine_data = raw_test_df[raw_test_df['engine_id'] == st.session_state.selected_engine]
 
