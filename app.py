@@ -1480,6 +1480,33 @@ def debug_engine_comparison(processed_df, engine_id, cycle, dataset, artifacts):
         st.warning(f"⚠️ Expected 525, got {total}")
 
     # ==========================================
+    # 🔍 بررسی مدل XGBoost
+    # ==========================================
+    st.write("### 🔍 XGBoost Model Check")
+
+    model = artifacts[dataset]['xgb_model']
+    st.write(f"Model type: {type(model)}")
+
+    # بررسی پارامترهای مدل
+    if hasattr(model, 'get_params'):
+        params = model.get_params()
+        st.write(f"Model parameters:")
+        st.write(f"  n_estimators: {params.get('n_estimators', 'N/A')}")
+        st.write(f"  max_depth: {params.get('max_depth', 'N/A')}")
+        st.write(f"  learning_rate: {params.get('learning_rate', 'N/A')}")
+
+    # بررسی تعداد ویژگی‌های مورد انتظار مدل
+    if hasattr(model, 'n_features_in_'):
+        st.write(f"Model expected features: {model.n_features_in_}")
+    else:
+        st.write("Model does not have n_features_in_ attribute")
+
+    # پیش‌بینی با مدل
+    features_array = np.array(features).reshape(1, -1)
+    pred = model.predict(features_array)[0]
+    st.write(f"**App RUL Prediction:** {pred:.2f}")
+    
+    # ==========================================
     # 🔍 بررسی ویژگی‌های پنجره‌ای (Window Features)
     # ==========================================
 
