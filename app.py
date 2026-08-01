@@ -960,25 +960,31 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
     anomaly_score = anomaly_scores['OCSVM']['percentile']
     interval_width = rul_upper - rul_lower
 
-    decision_params = artifacts[dataset]['decision_params']
+    final_thresholds = {
+        'rul_stop': 65,
+        'prob_stop': 0.05,
+        'anomaly_stop': 75,
+        'rul_inspect': 120,
+        'rul_inspect_lower': 90,
+        'prob_inspect': 0.08,
+        'anomaly_inspect': 78,
+        'trend_threshold': -4,
+        'monitor_prob': 0.05,
+    }
 
-    stop_rules = decision_params['stop_rules']
-    inspect_rules = decision_params['inspect_rules']
+    rul_trend = 0
 
-    if (rul_lower < stop_rules['rul_lower_bound'] or
-            prob_h30 > stop_rules['failure_prob_threshold'] or
-            anomaly_score > stop_rules['anomaly_threshold']):
+    if (rul_pred <= final_thresholds['rul_stop']) or \
+            (rul_lower <= 30) or \
+            ((prob_h30 > final_thresholds['prob_stop']) and (anomaly_score > final_thresholds['anomaly_stop'])):
 
         triggers = []
-        if rul_lower < stop_rules['rul_lower_bound']:
-            triggers.append(
-                f"RUL lower bound ({rul_lower:.0f}) below critical threshold ({stop_rules['rul_lower_bound']})")
-        if prob_h30 > stop_rules['failure_prob_threshold']:
-            triggers.append(
-                f"Failure probability ({prob_h30:.1%}) above critical threshold ({stop_rules['failure_prob_threshold']:.0%})")
-        if anomaly_score > stop_rules['anomaly_threshold']:
-            triggers.append(
-                f"Anomaly score ({anomaly_score:.1f}) above critical threshold ({stop_rules['anomaly_threshold']})")
+        if rul_pred <= final_thresholds['rul_stop']:
+            triggers.append(f"RUL prediction ({rul_pred:.0f}) below STOP threshold ({final_thresholds['rul_stop']})")
+        if rul_lower <= 30:
+            triggers.append(f"RUL lower bound ({rul_lower:.0f}) below critical threshold (30)")
+        if (prob_h30 > final_thresholds['prob_stop']) and (anomaly_score > final_thresholds['anomaly_stop']):
+            triggers.append(f"Failure probability ({prob_h30:.1%}) and Anomaly ({anomaly_score:.1f}) above thresholds")
 
         return {
             'action': 'STOP',
@@ -987,30 +993,40 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
             'confidence': 'HIGH' if len(triggers) >= 2 else 'MEDIUM'
         }
 
-    elif (rul_lower < inspect_rules['rul_lower_bound'] or
-          prob_h30 > inspect_rules['failure_prob_threshold'] or
-          anomaly_score > inspect_rules['anomaly_threshold'] or
-          interval_width > inspect_rules['uncertainty_threshold']):
+    elif (rul_pred <= final_thresholds['rul_inspect']) or \
+            (rul_lower <= final_thresholds['rul_inspect_lower']) or \
+            ((prob_h30 > final_thresholds['prob_inspect']) and (anomaly_score > final_thresholds['anomaly_inspect'])):
 
         triggers = []
-        if rul_lower < inspect_rules['rul_lower_bound']:
+        if rul_pred <= final_thresholds['rul_inspect']:
             triggers.append(
-                f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({inspect_rules['rul_lower_bound']})")
-        if prob_h30 > inspect_rules['failure_prob_threshold']:
+                f"RUL prediction ({rul_pred:.0f}) below INSPECT threshold ({final_thresholds['rul_inspect']})")
+        if rul_lower <= final_thresholds['rul_inspect_lower']:
             triggers.append(
-                f"Failure probability ({prob_h30:.1%}) above inspect threshold ({inspect_rules['failure_prob_threshold']:.0%})")
-        if anomaly_score > inspect_rules['anomaly_threshold']:
-            triggers.append(
-                f"Anomaly score ({anomaly_score:.1f}) above inspect threshold ({inspect_rules['anomaly_threshold']})")
-        if interval_width > inspect_rules['uncertainty_threshold']:
-            triggers.append(
-                f"Uncertainty width ({interval_width:.0f}) above inspect threshold ({inspect_rules['uncertainty_threshold']})")
+                f"RUL lower bound ({rul_lower:.0f}) below inspect threshold ({final_thresholds['rul_inspect_lower']})")
+        if (prob_h30 > final_thresholds['prob_inspect']) and (anomaly_score > final_thresholds['anomaly_inspect']):
+            triggers.append(f"Failure probability ({prob_h30:.1%}) and Anomaly ({anomaly_score:.1f}) above thresholds")
 
         return {
             'action': 'INSPECT',
             'color': 'orange',
             'triggers': triggers,
             'confidence': 'MEDIUM'
+        }
+
+    elif (prob_h30 > final_thresholds['monitor_prob']) or (anomaly_score > 85):
+        triggers = []
+        if prob_h30 > final_thresholds['monitor_prob']:
+            triggers.append(
+                f"Failure probability ({prob_h30:.1%}) above monitor threshold ({final_thresholds['monitor_prob']:.0%})")
+        if anomaly_score > 85:
+            triggers.append(f"Anomaly score ({anomaly_score:.1f}) above warning threshold (85)")
+
+        return {
+            'action': 'MONITOR',
+            'color': 'gold',
+            'triggers': triggers,
+            'confidence': 'LOW'
         }
 
     else:
@@ -1020,7 +1036,6 @@ def make_recommendation(rul_pred, rul_lower, rul_upper, failure_risks, anomaly_s
             'triggers': ['All parameters within normal range'],
             'confidence': 'HIGH'
         }
-
 
 def get_dataset_description(dataset):
     descriptions = {
