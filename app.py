@@ -18,43 +18,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #121212;
-        color: #ffffff;
-    }
-    .main {
-        background-color: #121212;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-    }
-
-    [data-testid="stSidebar"] {
-        background-color: #1a1a1a !important;
-        border-right: 1px solid #2a2a2a;
-    }
-    [data-testid="stSidebar"] .stMarkdown {
-        color: #b3b3b3;
-    }
-    [data-testid="stSidebar"] h1, 
-    [data-testid="stSidebar"] h2, 
-    [data-testid="stSidebar"] h3 {
-        color: #ffffff !important;
-    }
-
-    /* Selectbox */
-    .stSelectbox > div > div {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 1px solid #3a3a3a !important;
-    }
-    .stSelectbox > div > div:hover {
-        border-color: #1db954 !important;
-    }
-
-        .stSlider > div {
+    .stSlider > div {
         background: transparent !important;
     }
     .stSlider > div > div {
@@ -101,21 +65,25 @@ st.markdown("""
     .stSlider .stSliderTick {
         color: #b3b3b3 !important;
         background: transparent !important;
+        font-size: 12px !important;
     }
     .stSlider .stSliderNumber {
         color: #1db954 !important;
         background: transparent !important;
         padding: 0 !important;
         margin: 0 !important;
+        font-size: 14px !important;
     }
     .stSlider .stSliderNumber > div {
         color: #1db954 !important;
         background: transparent !important;
         padding: 0 !important;
+        font-size: 14px !important;
     }
     .stSlider .stSliderNumber > div > div {
         color: #1db954 !important;
         background: transparent !important;
+        font-size: 14px !important;
     }
     .stSlider [data-baseweb="slider"] + div {
         background: transparent !important;
@@ -129,6 +97,24 @@ st.markdown("""
         background: transparent !important;
     }
     .stSlider:hover .stSliderTick {
+        background: transparent !important;
+    }
+    .stSlider [data-testid="stSliderTickBarMin"] {
+        background: transparent !important;
+    }
+    .stSlider [data-testid="stSliderTickBarMax"] {
+        background: transparent !important;
+    }
+    .stSlider .stSliderTickBar {
+        background: transparent !important;
+    }
+    .stSlider .stSliderTickBar > div {
+        background: transparent !important;
+    }
+    .stSlider .stSliderTickBarMin {
+        background: transparent !important;
+    }
+    .stSlider .stSliderTickBarMax {
         background: transparent !important;
     }
 
