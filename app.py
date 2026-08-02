@@ -9,8 +9,6 @@ import warnings
 import random
 
 warnings.filterwarnings('ignore')
-random.seed(42)
-np.random.seed(42)
 
 st.set_page_config(
     page_title="Jet Engine Early Warning System",
@@ -68,7 +66,6 @@ def load_raw_data(dataset):
 
 @st.cache_data
 def load_preprocessed_fd001():
-    """بارگذاری داده‌های از پیش پردازش‌شده FD001 از فایل‌های .csv.gz فشرده"""
     try:
         df = pd.read_csv('data/test_window_fd001_preprocessed.csv.gz', compression='gzip')
         rul_df = pd.read_csv('data/rul_final_fd001.csv.gz', compression='gzip')
@@ -83,7 +80,6 @@ def load_preprocessed_fd001():
 
 @st.cache_data
 def load_preprocessed_fd002():
-    """بارگذاری داده‌های از پیش پردازش‌شده FD002 از فایل‌های .csv.gz فشرده"""
     try:
         df = pd.read_csv('data/test_window_fd002_preprocessed.csv.gz', compression='gzip')
         rul_df = pd.read_csv('data/rul_final_fd002.csv.gz', compression='gzip')
@@ -126,8 +122,9 @@ def extract_multi_window_features_single_engine(engine_df, window_info, feature_
     return df_out
 
 
-def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts):
-    current_row = processed_df[processed_df['cycle'] == selected_cycle]
+def get_features_for_prediction(processed_df, selected_engine, selected_cycle, selected_dataset, artifacts):
+    current_row = processed_df[(processed_df['engine_id'] == selected_engine) &
+                               (processed_df['cycle'] == selected_cycle)]
 
     if len(current_row) == 0:
         return None
@@ -136,7 +133,6 @@ def get_features_for_prediction(processed_df, selected_cycle, selected_dataset, 
     expected_features = feature_names['all_features']
 
     features = []
-
     for col in expected_features:
         if col in current_row.columns:
             val = current_row[col].values[0]
@@ -180,7 +176,6 @@ def predict_rul_fd001(features, dataset, artifacts):
     upper = pred_capped + q
 
     return pred_capped, lower, upper
-
 
 def predict_rul_fd002(engine_id, cycle, preprocessed_df, artifacts):
     row = preprocessed_df[(preprocessed_df['engine_id'] == engine_id) & (preprocessed_df['cycle'] == cycle)]
@@ -471,11 +466,12 @@ def main():
 
         predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
 
+
     if predict_button:
         st.session_state.prediction_done = True
 
         if selected_dataset == 'FD001':
-            features = get_features_for_prediction(processed_df, selected_cycle, selected_dataset, artifacts)
+            features = get_features_for_prediction(processed_df, selected_engine, selected_cycle, selected_dataset, artifacts)
             if features is None:
                 st.error("Could not extract features for prediction")
                 return
