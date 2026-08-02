@@ -71,12 +71,12 @@ st.markdown("""
         outline: 2px solid rgba(29, 185, 84, 0.5) !important;
         outline-offset: 2px !important;
     }
-    # .stSlider > div > div > div > div > div[role="slider"]:hover {
-    #     box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
-    # }
-    # .stSlider > div > div > div > div > div[role="slider"]:active {
-    #     box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
-    # }
+    .stSlider > div > div > div > div > div[role="slider"]:hover {
+        box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
+    }
+    .stSlider > div > div > div > div > div[role="slider"]:active {
+        box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
+    }
 
     # .stSlider [data-testid="stSliderTickBar"] {
     #     # color: #1db954 !important;
