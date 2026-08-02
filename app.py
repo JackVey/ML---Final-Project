@@ -58,11 +58,12 @@ st.markdown("""
         background: linear-gradient(90deg, #1db954, #1ed760) !important;
     }
     .stSlider > div > div > div > div {
-        background-color: #1db954 !important;
-        border: 2px solid #1db954 !important;
+        # background-color: #1db954 !important;
+        # border: 2px solid #1db954 !important;
     }
+    # tick number color
     .stSlider > div > div > div > div > div {
-        # color: #1db954 !important;
+        color: #1db954 !important;
     }
     # .stSlider > div > div > div > div[data-baseweb="slider"] {
     #     background: linear-gradient(90deg, #1db954, #1ed760) !important;
