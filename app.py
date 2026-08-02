@@ -6,15 +6,371 @@ import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
-import random
 
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
     page_title="Jet Engine Early Warning System",
-    page_icon="🛩️",
-    layout="wide"
+    page_icon="✈️",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ============================================================
+# 🎨 CUSTOM DARK THEME (Spotify Style)
+# ============================================================
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #121212;
+        color: #ffffff;
+    }
+    .main {
+        background-color: #121212;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+
+    [data-testid="stSidebar"] {
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #2a2a2a;
+    }
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #b3b3b3;
+    }
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3 {
+        color: #ffffff !important;
+    }
+
+    /* Selectbox */
+    .stSelectbox > div > div {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        border: 1px solid #3a3a3a !important;
+    }
+    .stSelectbox > div > div:hover {
+        border-color: #1db954 !important;
+    }
+
+    /* Slider - کاملاً سبز */
+    .stSlider > div > div > div {
+        background: linear-gradient(90deg, #1db954, #1ed760) !important;
+    }
+    .stSlider > div > div > div > div {
+        background-color: #1db954 !important;
+        border: 2px solid #1db954 !important;
+    }
+    .stSlider > div > div > div > div > div {
+        color: #1db954 !important;
+    }
+    .stSlider > div > div > div > div[data-baseweb="slider"] {
+        background: linear-gradient(90deg, #1db954, #1ed760) !important;
+    }
+    .stSlider > div > div > div > div > div[role="slider"] {
+        background-color: #1db954 !important;
+        border-color: #1db954 !important;
+    }
+    .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
+        outline: 2px solid rgba(29, 185, 84, 0.5) !important;
+        outline-offset: 2px !important;
+    }
+    .stSlider > div > div > div > div > div[role="slider"]:hover {
+        box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
+    }
+    .stSlider > div > div > div > div > div[role="slider"]:active {
+        box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
+    }
+
+    /* Number on slider */
+    .stSlider [data-testid="stSliderTickBar"] {
+        color: #1db954 !important;
+    }
+    .stSlider .stSliderTick {
+        color: #1db954 !important;
+    }
+    .stSlider .stSliderNumber {
+        color: #1db954 !important;
+    }
+    .stSlider .stSliderNumber > div {
+        color: #1db954 !important;
+    }
+    .stSlider .stSliderNumber > div > div {
+        color: #1db954 !important;
+    }
+
+    /* Button */
+    .stButton > button {
+        background: linear-gradient(135deg, #1db954, #1ed760) !important;
+        color: #121212 !important;
+        font-weight: 600 !important;
+        border: none !important;
+        border-radius: 50px !important;
+        padding: 10px 24px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3) !important;
+    }
+    .stButton > button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 6px 25px rgba(29, 185, 84, 0.5) !important;
+    }
+
+    /* Metrics Cards */
+    .metric-card {
+        background: #1a1a1a;
+        border-radius: 12px;
+        padding: 20px;
+        border: 2px solid #2a2a2a;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        cursor: default;
+    }
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #1db954, #1ed760);
+    }
+    .metric-card:hover {
+        transform: translateY(-4px);
+        border-color: #1db954;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .metric-card .label {
+        font-size: 13px;
+        color: #b3b3b3;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    .metric-card .value {
+        font-size: 32px;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 8px 0 4px 0;
+    }
+    .metric-card .sub {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .metric-card.green::before { background: linear-gradient(90deg, #1db954, #1ed760); }
+    .metric-card.green .value { color: #1db954; }
+    .metric-card.green:hover { border-color: #1db954; box-shadow: 0 8px 30px rgba(29, 185, 84, 0.3) !important;}
+
+    .metric-card.orange::before { background: linear-gradient(90deg, #fb8c00, #e65100); }
+    .metric-card.orange .value { color: #ff6b35; }
+    .metric-card.orange:hover { border-color: #ff6b35; box-shadow: 0 8px 30px rgba(251, 140, 0, 0.3) !important;}
+
+    .metric-card.red::before { background: linear-gradient(90deg, #e53935, #c62828); }
+    .metric-card.red .value { color: #e53935; }
+    .metric-card.red:hover { border-color: #e53935; box-shadow: 0 8px 30px rgba(229, 57, 53, 0.3) !important;}
+
+    .metric-card.purple::before { background: linear-gradient(90deg, #9b59b6, #c39bd3); }
+    .metric-card.purple .value { color: #9b59b6; }
+    .metric-card.purple:hover { border-color: #9b59b6; }
+
+    .metric-card.blue::before { background: linear-gradient(90deg, #3498db, #5dade2); }
+    .metric-card.blue .value { color: #3498db; }
+    .metric-card.blue:hover { border-color: #3498db; box-shadow: 0 8px 30px rgba(66, 165, 245, 0.15) !important;}
+
+    .metric-card.rec-card {
+        border-color: #2a2a2a;
+    }
+    .metric-card.rec-card:hover {
+        border-color: #1db954 !important;
+    }
+
+    /* Recommendation Button */
+    .rec-btn {
+        display: inline-block;
+        padding: 10px 24px;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 18px;
+        text-align: center;
+        letter-spacing: 0.5px;
+        margin-top: 8px;
+        transition: all 0.3s ease;
+        border: none;
+        width: 100%;
+    }
+    .rec-btn.stop {
+        background: linear-gradient(135deg, #c62828, #e53935);
+        color: #ffffff;
+        box-shadow: 0 4px 20px rgba(229, 57, 53, 0.3);
+    }
+    .rec-btn.inspect {
+        background: linear-gradient(135deg, #e65100, #fb8c00);
+        color: #ffffff;
+        box-shadow: 0 4px 20px rgba(251, 140, 0, 0.3);
+    }
+    .rec-btn.monitor {
+        background: linear-gradient(135deg, #f9a825, #fdd835);
+        color: #121212;
+        box-shadow: 0 4px 20px rgba(253, 216, 53, 0.3);
+    }
+    .rec-btn.continue {
+        background: linear-gradient(135deg, #1db954, #1ed760);
+        color: #121212;
+        box-shadow: 0 4px 20px rgba(29, 185, 84, 0.3);
+    }
+    .rec-btn:hover {
+        transform: scale(1.03);
+    }
+
+    /* Risk Boxes */
+    .risk-box {
+        background: #1a1a1a;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+        border: 1px solid #2a2a2a;
+        transition: all 0.3s ease;
+    }
+    .risk-box:hover {
+        border-color: #1db954;
+    }
+    .risk-box .horizon {
+        font-size: 13px;
+        color: #b3b3b3;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .risk-box .prob {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 8px 0;
+    }
+    .risk-box .status {
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    /* Anomaly Table */
+    .anomaly-table-container {
+        background: #1a1a1a;
+        border-radius: 10px;
+        border: 1px solid #2a2a2a;
+        overflow: hidden;
+        padding: 0;
+        width: 100%;
+    }
+    .anomaly-table-container table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+    .anomaly-table-container th {
+        background-color: #2a2a2a;
+        color: #ffffff;
+        padding: 10px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #3a3a3a;
+    }
+    .anomaly-table-container td {
+        padding: 10px 16px;
+        color: #b3b3b3;
+        border-bottom: 1px solid #2a2a2a;
+        font-size: 14px;
+    }
+    .anomaly-table-container tr:last-child td {
+        border-bottom: none;
+    }
+    .anomaly-table-container .status-normal {
+        color: #1db954;
+        font-weight: 500;
+    }
+    .anomaly-table-container .status-alert {
+        color: #e53935;
+        font-weight: 500;
+    }
+    .anomaly-table-container tr:hover td {
+        background-color: #252525;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #1a1a1a !important;
+        border: 1px solid #2a2a2a !important;
+        border-radius: 8px !important;
+        color: #ffffff !important;
+    }
+    .streamlit-expanderHeader:hover {
+        border-color: #1db954 !important;
+    }
+    .streamlit-expanderContent {
+        background-color: #121212 !important;
+        border: 1px solid #2a2a2a !important;
+        border-top: none !important;
+        border-radius: 0 0 8px 8px !important;
+    }
+
+    /* Dataframe */
+    .dataframe {
+        background-color: #1a1a1a !important;
+        border-radius: 8px !important;
+    }
+    .dataframe thead tr th {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+    }
+    .dataframe tbody tr td {
+        color: #b3b3b3 !important;
+    }
+
+    /* Divider */
+    hr {
+        border-color: #2a2a2a !important;
+        margin: 20px 0 !important;
+    }
+
+    .risk-section {
+        margin-top: 5px;
+    }
+
+    /* Warning/Success/Info boxes */
+    .stAlert {
+        border-radius: 8px !important;
+        border-left: 4px solid #1db954 !important;
+    }
+    .stAlert > div {
+        background-color: #1a1a1a !important;
+        color: #ffffff !important;
+    }
+
+    /* Metadata */
+    .metadata-label {
+        color: #b3b3b3;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    .metadata-value {
+        color: #ffffff;
+        font-size: 14px;
+    }
+
+    .header-icon {
+        display: inline-block;
+        padding: 1px 1px !important;
+        border-radius: 8px;
+        font-size: 28px;
+        line-height: 1;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -58,7 +414,8 @@ def load_artifacts():
 
 @st.cache_data
 def load_raw_data(dataset):
-    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in range(1, 22)]
+    col_names = ['engine_id', 'cycle'] + [f'op_setting_{i}' for i in range(1, 4)] + [f'sensor_{i}' for i in
+                                                                                     range(1, 22)]
     test_df = pd.read_csv(f'data/test_{dataset}.txt', sep=r'\s+', header=None, names=col_names)
     rul_df = pd.read_csv(f'data/RUL_{dataset}.txt', sep=r'\s+', header=None, names=['RUL_final'])
     return test_df, rul_df
@@ -70,11 +427,7 @@ def load_preprocessed_fd001():
         df = pd.read_csv('data/test_window_fd001_preprocessed.csv.gz', compression='gzip')
         rul_df = pd.read_csv('data/rul_final_fd001.csv.gz', compression='gzip')
         return df, rul_df
-    except FileNotFoundError as e:
-        st.error(f"File not found: {e}")
-        return None, None
-    except Exception as e:
-        st.error(f"Error loading preprocessed data: {e}")
+    except:
         return None, None
 
 
@@ -84,11 +437,7 @@ def load_preprocessed_fd002():
         df = pd.read_csv('data/test_window_fd002_preprocessed.csv.gz', compression='gzip')
         rul_df = pd.read_csv('data/rul_final_fd002.csv.gz', compression='gzip')
         return df, rul_df
-    except FileNotFoundError as e:
-        st.error(f"File not found: {e}")
-        return None, None
-    except Exception as e:
-        st.error(f"Error loading preprocessed data: {e}")
+    except:
         return None, None
 
 
@@ -176,6 +525,7 @@ def predict_rul_fd001(features, dataset, artifacts):
     upper = pred_capped + q
 
     return pred_capped, lower, upper
+
 
 def predict_rul_fd002(engine_id, cycle, preprocessed_df, artifacts):
     row = preprocessed_df[(preprocessed_df['engine_id'] == engine_id) & (preprocessed_df['cycle'] == cycle)]
@@ -420,8 +770,18 @@ def initialize_session_state():
 def main():
     initialize_session_state()
 
-    st.title("Jet Engine Early Warning System")
-    st.caption("Predictive Maintenance Dashboard for NASA C-MAPSS Turbofan Engines")
+    st.markdown("""
+    <div style="padding: 20px 0 10px 0;">
+        <h1 style="font-size: 36px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 12px;">
+            <span class="header-icon">✈️</span>
+            Jet Engine Early Warning System
+        </h1>
+        <p style="color: #b3b3b3; font-size: 16px; margin: 8px 0 0 0; padding-left: 4px;">
+            Predictive Maintenance Dashboard for NASA C-MAPSS Turbofan Engines
+        </p>
+    </div>
+    <hr>
+    """, unsafe_allow_html=True)
 
     with st.spinner("Loading model artifacts..."):
         artifacts = load_artifacts()
@@ -429,11 +789,12 @@ def main():
         preprocessed_fd002, rul_fd002 = load_preprocessed_fd002()
 
     with st.sidebar:
-        st.header("Engine Configuration")
+        st.markdown("### ⚙️ Configuration")
+        st.markdown("---")
 
         available_datasets = ['FD001', 'FD002']
         selected_dataset = st.selectbox(
-            "Select Dataset",
+            "📁 Dataset",
             available_datasets,
             format_func=lambda x: f"{x} - {get_dataset_description(x)}"
         )
@@ -448,30 +809,35 @@ def main():
 
             engines = sorted(test_df['engine_id'].unique())
             selected_engine = st.selectbox(
-                "Select Engine ID",
+                "🔧 Engine ID",
                 engines,
                 format_func=lambda x: f"Engine #{x}"
             )
             st.session_state.selected_engine = selected_engine
+
             engine_data = test_df[test_df['engine_id'] == selected_engine]
             cycles = sorted(engine_data['cycle'].unique())
+
+            st.markdown("### 🔄 Cycle Selection")
             selected_cycle = st.slider(
-                "Select Cycle",
+                "Cycle",
                 min_value=min(cycles),
                 max_value=max(cycles),
                 value=max(cycles),
-                step=1
+                step=1,
+                label_visibility="collapsed"
             )
             processed_df = test_df
 
-        predict_button = st.button("Run Prediction", type="primary", use_container_width=True)
-
+        st.markdown("---")
+        predict_button = st.button("🚀 Run Prediction", type="primary", use_container_width=True)
 
     if predict_button:
         st.session_state.prediction_done = True
 
         if selected_dataset == 'FD001':
-            features = get_features_for_prediction(processed_df, selected_engine, selected_cycle, selected_dataset, artifacts)
+            features = get_features_for_prediction(processed_df, selected_engine, selected_cycle, selected_dataset,
+                                                   artifacts)
             if features is None:
                 st.error("Could not extract features for prediction")
                 return
@@ -525,81 +891,223 @@ def main():
         selected_dataset = st.session_state.selected_dataset
         artifacts = st.session_state.artifacts
 
-        st.subheader("Current Engine Status")
+        st.markdown("### 📊 Current Engine Status")
+        st.markdown("---")
 
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric(
-                "Remaining Useful Life",
-                f"{rul_pred:.0f} cycles",
-                delta=f"95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]"
-            )
-
-        with col2:
-            prob_h30 = risks['h30']['probability']
-            st.metric(
-                "Failure Risk (30 cycles)",
-                f"{prob_h30:.1%}",
-                delta=f"Threshold: {risks['h30']['threshold']:.2f}"
-            )
-
-        with col3:
-            anomaly_score = anomaly_scores['OCSVM']['percentile']
-            st.metric(
-                "Anomaly Score",
-                f"{anomaly_score:.1f}th percentile",
-                delta="Critical > 95%"
-            )
-
-        with col4:
-            color = recommendation['color']
             st.markdown(f"""
-            <div style="padding: 15px; border-radius: 10px; background-color: {color}; text-align: center;">
-                <h2 style="color: white; margin: 0; font-size: 24px;">{recommendation['action']}</h2>
-                <p style="color: white; margin: 5px 0 0 0; font-size: 14px;">Confidence: {recommendation['confidence']}</p>
+            <div class="metric-card blue">
+                <div class="label">Remaining Useful Life</div>
+                <div class="value">{rul_pred:.0f}</div>
+                <div class="sub">95% CI: [{rul_lower:.0f}, {rul_upper:.0f}]</div>
             </div>
             """, unsafe_allow_html=True)
 
-        st.subheader("Failure Risk by Horizon")
+        with col2:
+            prob_h30 = risks['h30']['probability']
+            color = "green" if prob_h30 < 0.3 else "orange" if prob_h30 < 0.6 else "red"
+            st.markdown(f"""
+            <div class="metric-card {color}">
+                <div class="label">Failure Risk (30 cycles)</div>
+                <div class="value">{prob_h30:.1%}</div>
+                <div class="sub">Threshold: {risks['h30']['threshold']:.2f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col3:
+            anomaly_score = anomaly_scores['OCSVM']['percentile']
+            color = "green" if anomaly_score < 90 else "orange" if anomaly_score < 95 else "red"
+            st.markdown(f"""
+            <div class="metric-card {color}">
+                <div class="label">Anomaly Score</div>
+                <div class="value">{anomaly_score:.1f}</div>
+                <div class="sub">Critical > 95%</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col4:
+            action = recommendation['action']
+            confidence = recommendation['confidence']
+
+            # ============================================================
+            # 🎨 تعیین رنگ‌ها بر اساس action (بدون MONITOR)
+            # ============================================================
+            if action == 'STOP':
+                color = '#e53935'
+                color_dark = '#c62828'
+                glow_color = 'rgba(229, 57, 53, 0.3)'
+                text_color = '#ffffff'
+            elif action == 'INSPECT':
+                color = '#fb8c00'
+                color_dark = '#e65100'
+                glow_color = 'rgba(251, 140, 0, 0.3)'
+                text_color = '#ffffff'
+            else:  # CONTINUE
+                color = '#1db954'
+                color_dark = '#1ed760'
+                glow_color = 'rgba(29, 185, 84, 0.3)'
+                text_color = '#121212'
+
+            st.markdown(f"""
+            <style>
+                .rec-card-{action.lower()} {{
+                    border: 2px solid transparent !important;
+                    transition: all 0.3s ease !important;
+                    position: relative !important;
+                    overflow: hidden !important;
+                }}
+                .rec-card-{action.lower()}::before {{
+                    content: '' !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    height: 3px !important;
+                    background: linear-gradient(90deg, {color}, {color_dark}) !important;
+                    z-index: 2 !important;
+                }}
+                .rec-card-{action.lower()}::before {{
+                    background: linear-gradient(90deg, {color}, {color_dark}) !important;
+                }}
+                .rec-card-{action.lower()}:hover {{
+                    border-color: {color} !important;
+                    box-shadow: 0 8px 30px {glow_color} !important;
+                    transform: translateY(-4px);
+                }}
+                .metric-card.rec-card-{action.lower()}:hover {{
+                    border-color: {color} !important;
+                }}
+                .rec-btn-{action.lower()} {{
+                    background: linear-gradient(135deg, {color}, {color_dark}) !important;
+                    color: {text_color} !important;
+                    box-shadow: 0 4px 20px {glow_color} !important;
+                }}
+                .rec-btn-{action.lower()}:hover {{
+                    transform: scale(1.03);
+                }}
+            </style>
+            <div class="metric-card rec-card rec-card-{action.lower()}">
+                <div class="label">Recommendation</div>
+                <div class="rec-btn rec-btn-{action.lower()}">{action}</div>
+                <div class="sub" style="margin-top: 4px;">Confidence: {confidence}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div class="risk-section">', unsafe_allow_html=True)
+        st.markdown("### ⏱️ Failure Risk by Horizon")
+        st.markdown("---")
 
         col1, col2, col3 = st.columns(3)
+
+        thresholds = {
+            10: risks['h10']['threshold'],
+            20: risks['h20']['threshold'],
+            30: risks['h30']['threshold']
+        }
+
         for i, h in enumerate([10, 20, 30]):
             with [col1, col2, col3][i]:
                 prob = risks[f'h{h}']['probability']
                 alert = risks[f'h{h}']['alert']
-                st.metric(
-                    f"Risk in {h} cycles",
-                    f"{prob:.1%}",
-                    delta="ALERT" if alert else "Normal"
-                )
+                threshold = thresholds[h]
 
-        st.subheader("Anomaly Detection Results")
+                if prob >= 0.6:
+                    color = "#e53935"  # قرمز
+                    status_text = "HIGH RISK"
+                    status_icon = "🔴"
+                elif prob >= 0.3:
+                    color = "#ff6b35"  # نارنجی
+                    status_text = "MED RISK"
+                    status_icon = "🟠"
+                else:
+                    color = "#1db954"  # سبز
+                    status_text = "LOW RISK"
+                    status_icon = "🟢"
+
+                if alert:
+                    status_text = "ALERT"
+                    status_icon = "🔴"
+                    color = "#e53935"
+
+
+                st.markdown(f"""
+                <div class="risk-box">
+                    <div class="horizon">{h} Cycles</div>
+                    <div class="horizon"><span style="color: #666; font-size: 11px;">(Threshold: {threshold:.2f})</span></div>
+                    <div class="prob" style="color: {color};">{prob:.1%}</div>
+                    <div class="status" style="color: {color};">{status_icon} {status_text}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("### 🔍 Anomaly Detection Results")
+        st.markdown("---")
 
         anomaly_data = []
         for name, scores in anomaly_scores.items():
+            raw_score = scores['raw_score']
+            percentile = scores['percentile']
+
+            # تعیین وضعیت بر اساس درصد
+            if percentile >= 95:
+                status = 'CRITICAL'
+                icon = '🔴'
+            elif percentile >= 50:
+                status = 'WARNING'
+                icon = '🟡'
+            else:
+                status = 'NORMAL'
+                icon = '🟢'
+
             anomaly_data.append({
                 'Method': name,
-                'Score': f"{scores['percentile']:.1f}th percentile",
-                'Status': 'ALERT' if scores['alert'] else 'Normal'
+                'Raw Score': f"{raw_score:.4f}",
+                'Percentile': f"{percentile:.1f}th",
+                'Status': status,
+                'Icon': icon
             })
-        st.dataframe(pd.DataFrame(anomaly_data), hide_index=True, use_container_width=True)
 
-        st.subheader("Decision Triggers")
+        anomaly_df = pd.DataFrame(anomaly_data)
+
+        # تابع رنگ‌بندی بر اساس وضعیت
+        def color_status(val):
+            if val == 'CRITICAL':
+                return 'color: #e53935; font-weight: 600;'
+            elif val == 'WARNING':
+                return 'color: #f9a825; font-weight: 600;'
+            else:
+                return 'color: #1db954; font-weight: 600;'
+
+        styled_df = anomaly_df.style.applymap(color_status, subset=['Status'])
+
+        st.dataframe(
+            styled_df,
+            column_config={
+                "Method": "Method",
+                "Raw Score": "Raw Score",
+                "Percentile": "Percentile",
+                "Icon": "Status",
+                "Status": None  # مخفی کردن ستون Status
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+        st.markdown("### 🚨 Decision Triggers")
+        st.markdown("---")
 
         triggers = recommendation['triggers']
         if len(triggers) > 1:
-            st.warning("Active triggers:")
             for trigger in triggers:
-                st.write(f"- {trigger}")
+                st.warning(f"⚠️ {trigger}")
         else:
-            st.success(triggers[0])
+            st.success(f"✅ {triggers[0]}")
 
-        st.subheader("Engine Health Timeline")
+        st.markdown("### 📈 Engine Health Timeline")
+        st.markdown("---")
 
         dropped_sensors = artifacts[selected_dataset]['metadata'].get('dropped_sensors', [])
-
-        # برای پلات سنسورها از داده‌های خام استفاده کن
         raw_test_df, _ = load_raw_data(selected_dataset)
         raw_engine_data = raw_test_df[raw_test_df['engine_id'] == st.session_state.selected_engine]
 
@@ -609,25 +1117,26 @@ def main():
         col1, col2 = st.columns([2, 1])
         with col1:
             selected_sensor = st.selectbox(
-                "Select Sensor to Visualize",
+                "📊 Select Sensor to Visualize",
                 sensor_cols if sensor_cols else ['sensor_2'],
                 format_func=lambda x: x
             )
         with col2:
-            show_health = st.checkbox("Show Health Features", value=False)
+            show_health = st.checkbox("📊 Show Health Features", value=False)
 
         rul_data = processed_df[processed_df['engine_id'] == st.session_state.selected_engine]
 
         if show_health:
-            fig = make_subplots(rows=2, cols=1, subplot_titles=("RUL Over Time", "Anomaly Score Over Time"),
+            fig = make_subplots(rows=2, cols=1,
+                                subplot_titles=("🟢 RUL Over Time", "🔶 Anomaly Score Over Time"),
                                 vertical_spacing=0.15)
 
             fig.add_trace(
                 go.Scatter(x=raw_engine_data['cycle'], y=rul_data['RUL'], mode='lines', name='True RUL',
-                           line=dict(color='green', width=2)),
+                           line=dict(color='#1db954', width=3)),
                 row=1, col=1
             )
-            fig.add_hline(y=50, line_dash="dash", line_color="red", annotation_text="Critical", row=1, col=1)
+            fig.add_hline(y=50, line_dash="dash", line_color="#e53935", annotation_text="Critical", row=1, col=1)
 
             anomaly_col = 'OCSVM_Anomaly_Score'
             if anomaly_col in processed_df.columns:
@@ -635,13 +1144,20 @@ def main():
                 fig.add_trace(
                     go.Scatter(x=anomaly_data['cycle'], y=anomaly_data[anomaly_col], mode='lines',
                                name='Anomaly Score',
-                               line=dict(color='orange', width=2)),
+                               line=dict(color='#ff6b35', width=3)),
                     row=2, col=1
                 )
-                fig.add_hline(y=95, line_dash="dash", line_color="red", annotation_text="Critical", row=2, col=1)
-                fig.add_hline(y=90, line_dash="dot", line_color="orange", annotation_text="Warning", row=2, col=1)
+                fig.add_hline(y=95, line_dash="dash", line_color="#e53935", annotation_text="Critical", row=2, col=1)
+                fig.add_hline(y=90, line_dash="dot", line_color="#ff6b35", annotation_text="Warning", row=2, col=1)
 
-            fig.update_layout(height=500, showlegend=True)
+            fig.update_layout(
+                height=500,
+                showlegend=True,
+                template="plotly_dark",
+                paper_bgcolor='#121212',
+                plot_bgcolor='#121212',
+                font=dict(color='#ffffff')
+            )
 
         else:
             fig = go.Figure()
@@ -649,37 +1165,42 @@ def main():
             fig.add_trace(
                 go.Scatter(x=raw_engine_data['cycle'], y=raw_engine_data[selected_sensor], mode='lines',
                            name=selected_sensor,
-                           line=dict(color='blue', width=2))
+                           line=dict(color='#3498db', width=3))
             )
 
             fig.add_trace(
                 go.Scatter(x=rul_data['cycle'], y=rul_data['RUL'], mode='lines', name='RUL',
-                           line=dict(color='green', width=2, dash='dot'), yaxis='y2')
+                           line=dict(color='#1db954', width=2, dash='dot'), yaxis='y2')
             )
 
             fig.update_layout(
-                yaxis=dict(title=selected_sensor),
-                yaxis2=dict(title='RUL', overlaying='y', side='right'),
+                yaxis=dict(title=selected_sensor, color='#3498db', gridcolor='#2a2a2a'),
+                yaxis2=dict(title='RUL', overlaying='y', side='right', color='#1db954', gridcolor='#2a2a2a'),
                 height=400,
-                showlegend=True
+                showlegend=True,
+                template="plotly_dark",
+                paper_bgcolor='#121212',
+                plot_bgcolor='#121212',
+                font=dict(color='#ffffff'),
+                hovermode="x unified"
             )
 
-        fig.add_vline(x=selected_cycle, line_dash="dash", line_color="red", annotation_text="Current Cycle",
-                      annotation_position="top")
+        fig.add_vline(x=selected_cycle, line_dash="dash", line_color="#e53935",
+                      annotation_text="Current Cycle", annotation_position="top")
         st.plotly_chart(fig, use_container_width=True)
 
-        with st.expander("Model Metadata"):
+        with st.expander("📋 Model Metadata", expanded=False):
             metadata = artifacts[selected_dataset]['metadata']
             rul_params = artifacts[selected_dataset]['rul_params']
             col1, col2 = st.columns(2)
             with col1:
-                st.write("**Dataset Information**")
+                st.markdown("**📁 Dataset Information**")
                 st.write(f"- Dataset: {metadata.get('dataset', 'N/A')}")
                 st.write(f"- Description: {metadata.get('description', 'N/A')}")
                 st.write(f"- Training Date: {metadata.get('training_date', 'N/A')}")
                 st.write(f"- Author: {metadata.get('author', 'N/A')}")
             with col2:
-                st.write("**Model Configuration**")
+                st.markdown("**⚙️ Model Configuration**")
                 st.write(f"- Model Version: {metadata.get('model_version', 'N/A')}")
                 window_sizes = metadata.get('window_sizes', [])
                 if isinstance(window_sizes, list):
