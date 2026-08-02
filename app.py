@@ -54,9 +54,9 @@ st.markdown("""
         border-color: #1db954 !important;
     }
 
-    /*.stSlider > div > div > div {
+    .stSlider > div > div > div {
         background: linear-gradient(90deg, #1db954, #1ed760) !important;
-    }*/
+    }
     .stSlider > div > div > div > div {
         background-color: #1db954 !important;
         border: 2px solid #1db954 !important;
@@ -64,26 +64,26 @@ st.markdown("""
     .stSlider > div > div > div > div > div {
         color: #1db954 !important;
     }
-    .stSlider > div > div > div > div[data-baseweb="slider"] {
-        background: linear-gradient(90deg, #1db954, #1ed760) !important;
-    }
-    .stSlider > div > div > div > div > div[role="slider"] {
-        background-color: #1db954 !important;
-        border-color: #1db954 !important;
-    }
-    .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
-        outline: 2px solid rgba(29, 185, 84, 0.5) !important;
-        outline-offset: 2px !important;
-    }
-    .stSlider > div > div > div > div > div[role="slider"]:hover {
-        box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
-    }
-    .stSlider > div > div > div > div > div[role="slider"]:active {
-        box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
-    }
+    # .stSlider > div > div > div > div[data-baseweb="slider"] {
+    #     background: linear-gradient(90deg, #1db954, #1ed760) !important;
+    # }
+    # .stSlider > div > div > div > div > div[role="slider"] {
+    #     background-color: #1db954 !important;
+    #     border-color: #1db954 !important;
+    # }
+    # .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
+    #     outline: 2px solid rgba(29, 185, 84, 0.5) !important;
+    #     outline-offset: 2px !important;
+    # }
+    # .stSlider > div > div > div > div > div[role="slider"]:hover {
+    #     box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
+    # }
+    # .stSlider > div > div > div > div > div[role="slider"]:active {
+    #     box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
+    # }
 
     .stSlider [data-testid="stSliderTickBar"] {
-        color: #1db954 !important;
+        # color: #1db954 !important;
     }
     .stSlider .stSliderTick {
         color: #1db954 !important;
