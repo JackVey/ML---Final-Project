@@ -78,7 +78,7 @@ st.markdown("""
     #     box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
     # }
     # 
-    .stSlider [data-testid="stSliderTickBar"] {
+    .stSlider .stSliderTickBar {
         color: transparent !important;
     }
     # .stSlider .stSliderTick {
