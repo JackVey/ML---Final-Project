@@ -900,9 +900,6 @@ def main():
             action = recommendation['action']
             confidence = recommendation['confidence']
 
-            # ============================================================
-            # 🎨 تعیین رنگ‌ها بر اساس action (بدون MONITOR)
-            # ============================================================
             if action == 'STOP':
                 color = '#e53935'
                 color_dark = '#c62828'
@@ -913,7 +910,7 @@ def main():
                 color_dark = '#e65100'
                 glow_color = 'rgba(251, 140, 0, 0.3)'
                 text_color = '#ffffff'
-            else:  # CONTINUE
+            else:
                 color = '#1db954'
                 color_dark = '#1ed760'
                 glow_color = 'rgba(29, 185, 84, 0.3)'
@@ -983,15 +980,15 @@ def main():
                 threshold = thresholds[h]
 
                 if prob >= 0.6:
-                    color = "#e53935"  # قرمز
+                    color = "#e53935"
                     status_text = "HIGH RISK"
                     status_icon = "🔴"
                 elif prob >= 0.3:
-                    color = "#ff6b35"  # نارنجی
+                    color = "#ff6b35"
                     status_text = "MED RISK"
                     status_icon = "🟠"
                 else:
-                    color = "#1db954"  # سبز
+                    color = "#1db954"
                     status_text = "LOW RISK"
                     status_icon = "🟢"
 
@@ -1019,7 +1016,6 @@ def main():
             percentile = scores['percentile']
             is_alert = scores['alert']
 
-            # تعیین وضعیت بر اساس درصد
             if percentile >= 95:
                 status = 'CRITICAL'
                 icon = '🔴'
@@ -1040,9 +1036,6 @@ def main():
 
         anomaly_df = pd.DataFrame(anomaly_data)
 
-        # ============================================================
-        # ✅ تابع رنگ‌بندی با پشتیبانی از هر دو نسخه Pandas
-        # ============================================================
         def color_status(val):
             if val == 'CRITICAL':
                 return 'color: #e53935; font-weight: 600;'
@@ -1051,12 +1044,9 @@ def main():
             else:
                 return 'color: #1db954; font-weight: 600;'
 
-        # بررسی نسخه Pandas و استفاده از متد مناسب
         try:
-            # برای Pandas >= 2.1.0
             styled_df = anomaly_df.style.map(color_status, subset=['Status'])
         except AttributeError:
-            # برای Pandas < 2.1.0
             styled_df = anomaly_df.style.applymap(color_status, subset=['Status'])
 
         st.dataframe(
