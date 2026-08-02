@@ -1048,6 +1048,7 @@ def main():
         for name, scores in anomaly_scores.items():
             raw_score = scores['raw_score']
             percentile = scores['percentile']
+            is_alert = scores['alert']
 
             # تعیین وضعیت بر اساس درصد
             if percentile >= 95:
@@ -1070,7 +1071,9 @@ def main():
 
         anomaly_df = pd.DataFrame(anomaly_data)
 
-        # تابع رنگ‌بندی بر اساس وضعیت
+        # ============================================================
+        # ✅ تابع رنگ‌بندی با پشتیبانی از هر دو نسخه Pandas
+        # ============================================================
         def color_status(val):
             if val == 'CRITICAL':
                 return 'color: #e53935; font-weight: 600;'
@@ -1079,7 +1082,13 @@ def main():
             else:
                 return 'color: #1db954; font-weight: 600;'
 
-        styled_df = anomaly_df.style.applymap(color_status, subset=['Status'])
+        # بررسی نسخه Pandas و استفاده از متد مناسب
+        try:
+            # برای Pandas >= 2.1.0
+            styled_df = anomaly_df.style.map(color_status, subset=['Status'])
+        except AttributeError:
+            # برای Pandas < 2.1.0
+            styled_df = anomaly_df.style.applymap(color_status, subset=['Status'])
 
         st.dataframe(
             styled_df,
@@ -1088,7 +1097,7 @@ def main():
                 "Raw Score": "Raw Score",
                 "Percentile": "Percentile",
                 "Icon": "Status",
-                "Status": None  # مخفی کردن ستون Status
+                "Status": None
             },
             hide_index=True,
             use_container_width=True
