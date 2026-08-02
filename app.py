@@ -54,15 +54,26 @@ st.markdown("""
         border-color: #1db954 !important;
     }
 
+        .stSlider > div {
+        background: transparent !important;
+    }
+    .stSlider > div > div {
+        background: transparent !important;
+    }
     .stSlider > div > div > div {
         background: linear-gradient(90deg, #1db954, #1ed760) !important;
+        height: 4px !important;
     }
     .stSlider > div > div > div > div {
         background-color: #1db954 !important;
         border: 2px solid #1db954 !important;
+        width: 16px !important;
+        height: 16px !important;
     }
     .stSlider > div > div > div > div > div {
         color: #1db954 !important;
+        background: transparent !important;
+        font-weight: 600 !important;
     }
     .stSlider > div > div > div > div[data-baseweb="slider"] {
         background: linear-gradient(90deg, #1db954, #1ed760) !important;
@@ -70,6 +81,8 @@ st.markdown("""
     .stSlider > div > div > div > div > div[role="slider"] {
         background-color: #1db954 !important;
         border-color: #1db954 !important;
+        width: 16px !important;
+        height: 16px !important;
     }
     .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
         outline: 2px solid rgba(29, 185, 84, 0.5) !important;
@@ -81,20 +94,42 @@ st.markdown("""
     .stSlider > div > div > div > div > div[role="slider"]:active {
         box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
     }
-
     .stSlider [data-testid="stSliderTickBar"] {
-        color: #1db954 !important;
+        color: #b3b3b3 !important;
+        background: transparent !important;
     }
     .stSlider .stSliderTick {
-        color: #1db954 !important;
+        color: #b3b3b3 !important;
+        background: transparent !important;
     }
     .stSlider .stSliderNumber {
+        color: #1db954 !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     .stSlider .stSliderNumber > div {
         color: #1db954 !important;
+        background: transparent !important;
+        padding: 0 !important;
     }
     .stSlider .stSliderNumber > div > div {
         color: #1db954 !important;
+        background: transparent !important;
+    }
+    .stSlider [data-baseweb="slider"] + div {
+        background: transparent !important;
+        color: #1db954 !important;
+    }
+    .stSlider [data-baseweb="slider"] + div > div {
+        background: transparent !important;
+        color: #1db954 !important;
+    }
+    .stSlider:hover [data-testid="stSliderTickBar"] {
+        background: transparent !important;
+    }
+    .stSlider:hover .stSliderTick {
+        background: transparent !important;
     }
 
     /* Button */
