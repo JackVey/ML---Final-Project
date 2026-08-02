@@ -30,13 +30,13 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    # [data-testid="stSidebar"] {
-    #     background-color: #1a1a1a !important;
-    #     border-right: 1px solid #2a2a2a;
-    # }
-    # [data-testid="stSidebar"] .stMarkdown {
-    #     color: #b3b3b3;
-    # }
+    [data-testid="stSidebar"] {
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #2a2a2a;
+    }
+    [data-testid="stSidebar"] .stMarkdown {
+        color: #b3b3b3;
+    }
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3 {
@@ -54,7 +54,7 @@ st.markdown("""
     }
 
     .stSlider > div > div > div {
-        background: linear-gradient(90deg, #1db954, #1ed760) !important;
+        # background: linear-gradient(90deg, #1db954, #1ed760) !important;
     }
     
     .stSlider > div > div > div > div > div {
