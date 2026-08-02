@@ -30,20 +30,19 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    [data-testid="stSidebar"] {
-        background-color: #1a1a1a !important;
-        border-right: 1px solid #2a2a2a;
-    }
-    [data-testid="stSidebar"] .stMarkdown {
-        color: #b3b3b3;
-    }
+    # [data-testid="stSidebar"] {
+    #     background-color: #1a1a1a !important;
+    #     border-right: 1px solid #2a2a2a;
+    # }
+    # [data-testid="stSidebar"] .stMarkdown {
+    #     color: #b3b3b3;
+    # }
     [data-testid="stSidebar"] h1, 
     [data-testid="stSidebar"] h2, 
     [data-testid="stSidebar"] h3 {
         color: #ffffff !important;
     }
 
-    /* Selectbox */
     .stSelectbox > div > div {
         background-color: #2a2a2a !important;
         color: #ffffff !important;
@@ -95,7 +94,6 @@ st.markdown("""
     #     # color: #1db954 !important;
     # }
 
-    /* Button */
     .stButton > button {
         background: linear-gradient(135deg, #1db954, #1ed760) !important;
         color: #121212 !important;
@@ -111,7 +109,6 @@ st.markdown("""
         box-shadow: 0 6px 25px rgba(29, 185, 84, 0.5) !important;
     }
 
-    /* Metrics Cards */
     .metric-card {
         background: #1a1a1a;
         border-radius: 12px;
@@ -181,7 +178,6 @@ st.markdown("""
         border-color: #1db954 !important;
     }
 
-    /* Recommendation Button */
     .rec-btn {
         display: inline-block;
         padding: 10px 24px;
@@ -219,7 +215,6 @@ st.markdown("""
         transform: scale(1.03);
     }
 
-    /* Risk Boxes */
     .risk-box {
         background: #1a1a1a;
         border-radius: 10px;
@@ -247,7 +242,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* Anomaly Table */
     .anomaly-table-container {
         background: #1a1a1a;
         border-radius: 10px;
@@ -293,7 +287,6 @@ st.markdown("""
         background-color: #252525;
     }
 
-    /* Expander */
     .streamlit-expanderHeader {
         background-color: #1a1a1a !important;
         border: 1px solid #2a2a2a !important;
@@ -310,7 +303,6 @@ st.markdown("""
         border-radius: 0 0 8px 8px !important;
     }
 
-    /* Dataframe */
     .dataframe {
         background-color: #1a1a1a !important;
         border-radius: 8px !important;
@@ -323,7 +315,6 @@ st.markdown("""
         color: #b3b3b3 !important;
     }
 
-    /* Divider */
     hr {
         border-color: #2a2a2a !important;
         margin: 20px 0 !important;
@@ -333,7 +324,6 @@ st.markdown("""
         margin-top: 5px;
     }
 
-    /* Warning/Success/Info boxes */
     .stAlert {
         border-radius: 8px !important;
         border-left: 4px solid #1db954 !important;
@@ -343,7 +333,6 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Metadata */
     .metadata-label {
         color: #b3b3b3;
         font-size: 13px;
