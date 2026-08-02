@@ -6,8 +6,11 @@ import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
+import random
 
 warnings.filterwarnings('ignore')
+random.seed(42)
+np.random.seed(42)
 
 st.set_page_config(
     page_title="Jet Engine Early Warning System",
