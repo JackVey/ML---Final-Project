@@ -60,9 +60,9 @@ st.markdown("""
     .stSlider > div > div > div > div > div {
         color: #1db954 !important;
     }
-    # .stSlider > div > div > div > div[data-baseweb="slider"] {
-    #     background: linear-gradient(90deg, #1db954, #1ed760) !important;
-    # }
+    .stSlider > div > div > div > div[data-baseweb="slider"] {
+        background: linear-gradient(90deg, #1db954, #1ed760) !important;
+    }
     .stSlider > div > div > div > div > div[role="slider"] {
         background-color: #1db954 !important;
         border-color: #1db954 !important;
