@@ -67,10 +67,10 @@ st.markdown("""
         background-color: #1db954 !important;
         border-color: #1db954 !important;
     }
-    # .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
-    #     outline: 2px solid rgba(29, 185, 84, 0.5) !important;
-    #     outline-offset: 2px !important;
-    # }
+    .stSlider > div > div > div > div > div[role="slider"]:focus-visible {
+        outline: 2px solid rgba(29, 185, 84, 0.5) !important;
+        outline-offset: 2px !important;
+    }
     # .stSlider > div > div > div > div > div[role="slider"]:hover {
     #     box-shadow: 0 0 0 4px rgba(29, 185, 84, 0.3) !important;
     # }
