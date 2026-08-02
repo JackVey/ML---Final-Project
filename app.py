@@ -86,16 +86,16 @@ st.markdown("""
         # color: #1db954 !important;
     }
     .stSlider .stSliderTick {
-        color: #1db954 !important;
+        # color: #1db954 !important;
     }
     .stSlider .stSliderNumber {
-        color: #1db954 !important;
+        # color: #1db954 !important;
     }
     .stSlider .stSliderNumber > div {
-        color: #1db954 !important;
+        # color: #1db954 !important;
     }
     .stSlider .stSliderNumber > div > div {
-        color: #1db954 !important;
+        # color: #1db954 !important;
     }
 
     /* Button */
