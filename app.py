@@ -79,21 +79,21 @@ st.markdown("""
     #     box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.4) !important;
     # }
 
-    .stSlider [data-testid="stSliderTickBar"] {
-        # color: #1db954 !important;
-    }
-    .stSlider .stSliderTick {
-        # color: #1db954 !important;
-    }
-    .stSlider .stSliderNumber {
-        # color: #1db954 !important;
-    }
-    .stSlider .stSliderNumber > div {
-        # color: #1db954 !important;
-    }
-    .stSlider .stSliderNumber > div > div {
-        # color: #1db954 !important;
-    }
+    # .stSlider [data-testid="stSliderTickBar"] {
+    #     # color: #1db954 !important;
+    # }
+    # .stSlider .stSliderTick {
+    #     # color: #1db954 !important;
+    # }
+    # .stSlider .stSliderNumber {
+    #     # color: #1db954 !important;
+    # }
+    # .stSlider .stSliderNumber > div {
+    #     # color: #1db954 !important;
+    # }
+    # .stSlider .stSliderNumber > div > div {
+    #     # color: #1db954 !important;
+    # }
 
     /* Button */
     .stButton > button {
