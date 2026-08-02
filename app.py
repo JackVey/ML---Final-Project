@@ -59,7 +59,7 @@ st.markdown("""
     }
     .stSlider > div > div > div > div {
         # background-color: #1db954 !important;
-        # border: 2px solid #1db954 !important;
+        border: 2px solid #1db954 !important;
     }
     # tick number color
     .stSlider > div > div > div > div > div {
